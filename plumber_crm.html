@@ -146,6 +146,35 @@
   .lead-card a.call{
     text-decoration:none;
   }
+  .social-row{display:flex;gap:6px;margin-top:8px;}
+  .social-icon{
+    width:30px;height:30px;border-radius:6px;display:flex;align-items:center;justify-content:center;
+    text-decoration:none;font-size:0.95rem;border:1px solid var(--line);background:#fff;color:var(--pipe-dark);
+  }
+  .social-icon.fb{color:#1877F2;border-color:#1877F2;}
+  .social-icon.ig{color:#C13584;border-color:#C13584;}
+  .social-icon.x{color:#111;border-color:#111;}
+  .social-icon.missing{opacity:0.3;pointer-events:none;}
+  .badge.dm{background:#dbe6ee;color:var(--pipe-dark);}
+  .badge.email{background:#eee7d6;color:var(--brass-dark);}
+  .badge.calldue{background:var(--warn);color:#fff;}
+  .badge.callover{background:var(--rust);color:#fff;}
+
+  .social-edit-row{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
+  .social-edit-row .plat{width:70px;flex:0 0 auto;font-family:'Courier New',monospace;font-size:0.7rem;text-transform:uppercase;color:var(--muted);}
+  .social-edit-row input{flex:1;}
+  .findlink{font-family:'Courier New',monospace;font-size:0.62rem;color:var(--pipe);text-decoration:underline;white-space:nowrap;flex:0 0 auto;}
+
+  .outreach-log{border:1px solid var(--line);border-radius:6px;background:#fff;padding:8px 10px;margin-bottom:10px;}
+  .outreach-entry{display:flex;justify-content:space-between;font-size:0.78rem;padding:4px 0;border-bottom:1px solid var(--line);}
+  .outreach-entry:last-child{border-bottom:none;}
+  .outreach-entry .ot{font-family:'Courier New',monospace;color:var(--muted);}
+  .outreach-btns{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;}
+  .next-action-box{
+    background:#fbf7ec;border:1px solid var(--warn);border-radius:6px;padding:8px 12px;margin-bottom:12px;
+    font-size:0.82rem;display:flex;justify-content:space-between;align-items:center;
+  }
+  .next-action-box.overdue{border-color:var(--rust);background:#fbeae6;}
 
   /* empty state */
   .empty{
@@ -446,6 +475,15 @@ function renderLeadCard(lead){
     else if(ds === 'due') dueBadge += `<span class="badge due">${fu.label} due today</span>`;
   });
   const telHref = lead.phone ? `tel:${lead.phone.replace(/[^0-9+]/g,'')}` : null;
+  const s = lead.socials || {};
+
+  const na = nextAction(lead);
+  let naBadge = '';
+  if(na){
+    if(na.state==='overdue') naBadge = `<span class="badge callover">⚠ ${escapeHtml(na.label)}</span>`;
+    else if(na.state==='due') naBadge = `<span class="badge calldue">${escapeHtml(na.label)}</span>`;
+    else if(na.state==='todo') naBadge = `<span class="badge ${hasAnySocial(lead)?'dm':'email'}">${escapeHtml(na.label)}</span>`;
+  }
 
   return `
   <div class="lead-card ${lane==='B'?'laneB':''}" data-id="${lead.id}">
@@ -461,6 +499,12 @@ function renderLeadCard(lead){
       <span class="badge ${lane==='A'?'lane-a':'lane-b'}">Lane ${lane}</span>
       ${gate?'<span class="badge gate">Gatekeeper</span>':''}
       ${dueBadge}
+      ${naBadge}
+    </div>
+    <div class="social-row">
+      <a class="social-icon fb ${s.facebook?'':'missing'}" href="${s.facebook||'#'}" target="_blank" rel="noopener" title="Facebook">f</a>
+      <a class="social-icon ig ${s.instagram?'':'missing'}" href="${s.instagram||'#'}" target="_blank" rel="noopener" title="Instagram">◎</a>
+      <a class="social-icon x ${s.x?'':'missing'}" href="${s.x||'#'}" target="_blank" rel="noopener" title="X / Twitter">𝕏</a>
     </div>
     <div class="actions">
       <button class="btn small" data-action="open" data-id="${lead.id}">Open</button>
@@ -701,7 +745,53 @@ function newLead(name, phone, address){
     upsellIdeasDiscussed: '',
     tradeNetworkNotes: '',
     notes: '',
+    socials: { facebook:'', instagram:'', x:'' },
+    outreachLog: [], // {type:'dm'|'email'|'call'|'reply', date:'YYYY-MM-DD', time:'HH:MM'}
   };
+}
+
+// ---------- Outreach / social helpers ----------
+function hasAnySocial(lead){
+  const s = lead.socials || {};
+  return !!(s.facebook || s.instagram || s.x);
+}
+function nowTimeStr(){
+  const d = new Date();
+  return d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+}
+function logOutreach(lead, type){
+  if(!lead.outreachLog) lead.outreachLog = [];
+  lead.outreachLog.push({ type, date: todayStr(), time: nowTimeStr() });
+  // auto-advance status from Untouched on first contact
+  if(lead.status === 'Untouched') lead.status = 'Contacted';
+}
+function lastOutreachEntry(lead){
+  const log = lead.outreachLog || [];
+  return log.length ? log[log.length-1] : null;
+}
+// Determines the next recommended action per the DM -> wait 7d -> call,
+// or (no social) email -> wait 7d -> call, workflow.
+function nextAction(lead){
+  const log = lead.outreachLog || [];
+  if(!log.length){
+    return hasAnySocial(lead)
+      ? {label:'DM via social', state:'todo'}
+      : {label:'Send email', state:'todo'};
+  }
+  const last = log[log.length-1];
+  if(last.type === 'call' || last.type === 'reply'){
+    return null; // ball's in their court / handled manually from here
+  }
+  // last was 'dm' or 'email' — a call is due 7 days later
+  const dueDate = addDays(last.date, 7);
+  const today = todayStr();
+  if(today < dueDate){
+    return {label:`Call if no reply by ${fmtDate(dueDate)}`, state:'waiting', dueDate};
+  }
+  if(today === dueDate){
+    return {label:'Call — due today', state:'due', dueDate};
+  }
+  return {label:'Call — overdue', state:'overdue', dueDate};
 }
 
 // ---------- Lead detail modal ----------
@@ -737,6 +827,41 @@ function openLeadModal(id){
     </div>`;
   }).join('');
 
+  const s = lead.socials || {facebook:'',instagram:'',x:''};
+  const q = encodeURIComponent(lead.name + ' ' + (lead.address||'') + ' plumbing');
+  const socialEditHtml = `
+    <div class="social-edit-row">
+      <span class="plat">Facebook</span>
+      <input type="text" id="soc_fb" placeholder="https://facebook.com/…" value="${escapeHtml(s.facebook)}">
+      <a class="findlink" target="_blank" rel="noopener" href="https://www.google.com/search?q=${q}+facebook">find →</a>
+    </div>
+    <div class="social-edit-row">
+      <span class="plat">Instagram</span>
+      <input type="text" id="soc_ig" placeholder="https://instagram.com/…" value="${escapeHtml(s.instagram)}">
+      <a class="findlink" target="_blank" rel="noopener" href="https://www.google.com/search?q=${q}+instagram">find →</a>
+    </div>
+    <div class="social-edit-row">
+      <span class="plat">X</span>
+      <input type="text" id="soc_x" placeholder="https://x.com/…" value="${escapeHtml(s.x)}">
+      <a class="findlink" target="_blank" rel="noopener" href="https://www.google.com/search?q=${q}+twitter">find →</a>
+    </div>`;
+
+  const na = nextAction(lead);
+  const naBoxHtml = na ? `
+    <div class="next-action-box ${na.state==='overdue'?'overdue':''}">
+      <span>${escapeHtml(na.label)}</span>
+    </div>` : '';
+
+  const log = lead.outreachLog || [];
+  const logHtml = log.length ? `
+    <div class="outreach-log">
+      ${log.slice().reverse().map(e=>`
+        <div class="outreach-entry">
+          <span>${e.type==='dm'?'DM sent':e.type==='email'?'Email sent':e.type==='call'?'Called':'Replied'}</span>
+          <span class="ot">${fmtDate(e.date)} · ${e.time}</span>
+        </div>`).join('')}
+    </div>` : `<p style="font-size:0.8rem;color:var(--muted);">No outreach logged yet.</p>`;
+
   const fus = leadFollowups(lead);
   const followupHtml = fus.length ? `
     <div class="followup-box">
@@ -757,6 +882,19 @@ function openLeadModal(id){
       </div>
 
       ${followupHtml}
+      ${naBoxHtml}
+
+      <div class="section-label">Social Profiles</div>
+      ${socialEditHtml}
+
+      <div class="section-label">Outreach Log</div>
+      ${logHtml}
+      <div class="outreach-btns">
+        <button type="button" class="btn small" id="logDmBtn">Log DM'd</button>
+        <button type="button" class="btn small brass" id="logEmailBtn">Log Emailed</button>
+        <button type="button" class="btn small secondary" id="logCallBtn">Log Called</button>
+        <button type="button" class="btn small secondary" id="logReplyBtn">Log Replied</button>
+      </div>
 
       <div class="field-row">
         <label>Business Name</label>
@@ -860,7 +998,28 @@ function openLeadModal(id){
     });
   });
 
+  function readSocialsFromForm(){
+    if(!lead.socials) lead.socials = {facebook:'',instagram:'',x:''};
+    lead.socials.facebook = document.getElementById('soc_fb').value.trim();
+    lead.socials.instagram = document.getElementById('soc_ig').value.trim();
+    lead.socials.x = document.getElementById('soc_x').value.trim();
+  }
+
+  ['logDmBtn','logEmailBtn','logCallBtn','logReplyBtn'].forEach(id=>{
+    const btn = document.getElementById(id);
+    if(!btn) return;
+    btn.onclick = async ()=>{
+      readSocialsFromForm();
+      const type = id==='logDmBtn'?'dm':id==='logEmailBtn'?'email':id==='logCallBtn'?'call':'reply';
+      logOutreach(lead, type);
+      if(isNew) state.leads.push(lead);
+      await saveLeads();
+      openLeadModal(lead.id); // re-render modal in place with updated log
+    };
+  });
+
   document.getElementById('saveLead').onclick = async ()=>{
+    readSocialsFromForm();
     lead.name = document.getElementById('f_name').value.trim() || 'Unnamed Lead';
     lead.decisionMaker = document.getElementById('f_dm').value.trim();
     lead.phone = document.getElementById('f_phone').value.trim();
