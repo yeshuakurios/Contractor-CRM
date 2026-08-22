@@ -253,6 +253,7 @@ async function openLeadModal(id){
         <select id="f_status">${OUTREACH_STATUSES.map(s => `<option value="${s}" ${lead.outreach_status===s?'selected':''}>${s}</option>`).join('')}</select>
       </div>
       ${isNew ? '' : renderAuditSection(lead)}
+      ${isNew ? '' : renderStagesSection(lead)}
       ${isNew ? '' : `
       <div class="field-row"><label>Activity Log</label></div>
       <div class="activity-list">
@@ -330,6 +331,31 @@ async function openLeadModal(id){
       window.open(URL.createObjectURL(blob), '_blank');
     };
     if (lead.latest_audit && lead.latest_audit.status === 'running') pollAudit(lead.id);
+
+    const startPipelineBtn = document.getElementById('startPipelineBtn');
+    if (startPipelineBtn) startPipelineBtn.onclick = async () => {
+      try {
+        await api('/leads/' + lead.id + '/stages/start', { method: 'POST' });
+        openLeadModal(lead.id);
+      } catch (e) { alert(e.message); }
+    };
+    document.querySelectorAll('.stage-item-check').forEach(cb => {
+      cb.onchange = async () => {
+        try {
+          await api(`/leads/${lead.id}/stages/${cb.dataset.stage}/items/${cb.dataset.item}`, {
+            method: 'PATCH', body: JSON.stringify({ checked: cb.checked }),
+          });
+          openLeadModal(lead.id);
+        } catch (e) { alert(e.message); cb.checked = !cb.checked; }
+      };
+    });
+    const advanceBtn = document.getElementById('advanceStageBtn');
+    if (advanceBtn) advanceBtn.onclick = async () => {
+      try {
+        await api('/leads/' + lead.id + '/stages/advance', { method: 'POST' });
+        openLeadModal(lead.id);
+      } catch (e) { alert(e.message); }
+    };
   }
 }
 
@@ -365,6 +391,42 @@ function renderAuditSection(lead){
         html += `<button class="btn small secondary" id="viewMockupBtn">View Mockup</button>`;
       }
       html += `</div>`;
+    }
+  }
+  return html;
+}
+
+function renderStagesSection(lead){
+  let html = `<div class="field-row"><label>Pipeline</label></div>`;
+  if (lead.pipeline_stage == null) {
+    html += `<button class="btn block brass" id="startPipelineBtn">Start Pipeline (Client Agreed)</button>`;
+    return html;
+  }
+
+  const stages = lead.stages || [];
+  html += `<div style="margin-bottom:10px;">`;
+  stages.forEach(s => {
+    const marker = s.complete ? '✓' : (s.current ? '●' : '○');
+    const style = s.current ? 'color:var(--pipe);font-weight:bold;' : (s.complete ? 'color:var(--ok);' : 'color:var(--muted);');
+    html += `<div style="font-size:0.82rem;padding:3px 0;${style}">${marker} Stage ${s.number}: ${escapeHtml(s.label)}</div>`;
+  });
+  html += `</div>`;
+
+  const current = stages.find(s => s.current);
+  if (current) {
+    html += `<div style="background:#fff;border:1px solid var(--line);border-radius:6px;padding:10px 12px;">`;
+    current.items.forEach(i => {
+      html += `
+      <label style="display:flex;align-items:center;gap:8px;font-size:0.85rem;padding:5px 0;">
+        <input type="checkbox" class="stage-item-check" data-stage="${current.number}" data-item="${i.key}" ${i.checked ? 'checked' : ''}>
+        ${escapeHtml(i.label)}
+      </label>`;
+    });
+    html += `</div>`;
+    if (current.complete && current.number < 7) {
+      html += `<button class="btn block brass" id="advanceStageBtn" style="margin-top:10px;">Advance to Stage ${current.number + 1}</button>`;
+    } else if (current.complete && current.number === 7) {
+      html += `<p style="color:var(--ok);font-size:0.85rem;margin-top:10px;">✓ Fully Optimized — all stages complete.</p>`;
     }
   }
   return html;

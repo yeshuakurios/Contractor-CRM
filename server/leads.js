@@ -3,6 +3,7 @@ const { pool } = require('./db');
 const { searchPlaces } = require('./places');
 const { discoverAndVerifySocials } = require('./social');
 const { runAudit } = require('./audit');
+const { computeStages, fetchStageItemRows } = require('./stages');
 
 const router = express.Router();
 
@@ -26,13 +27,20 @@ router.get('/:id', async (req, res, next) => {
     const lead = rows[0];
     if (!lead) return res.status(404).json({ error: 'Not found' });
 
-    const [activity, socials, audits] = await Promise.all([
+    const [activity, socials, audits, stageItems] = await Promise.all([
       pool.query('SELECT id, author, text, created_at FROM activity_log WHERE lead_id = $1 ORDER BY created_at DESC', [lead.id]),
       pool.query('SELECT platform, url, verification_status, verified_via, verified_at FROM lead_socials WHERE lead_id = $1', [lead.id]),
       pool.query('SELECT * FROM audit_reports WHERE lead_id = $1 ORDER BY created_at DESC LIMIT 1', [lead.id]),
+      fetchStageItemRows(lead.id),
     ]);
 
-    res.json({ ...lead, activity: activity.rows, socials: socials.rows, latest_audit: audits.rows[0] || null });
+    res.json({
+      ...lead,
+      activity: activity.rows,
+      socials: socials.rows,
+      latest_audit: audits.rows[0] || null,
+      stages: computeStages(stageItems, lead.pipeline_stage),
+    });
   } catch (err) { next(err); }
 });
 
