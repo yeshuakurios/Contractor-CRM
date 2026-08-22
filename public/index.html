@@ -252,6 +252,7 @@ async function openLeadModal(id){
       <div class="field-row"><label>Outreach Status</label>
         <select id="f_status">${OUTREACH_STATUSES.map(s => `<option value="${s}" ${lead.outreach_status===s?'selected':''}>${s}</option>`).join('')}</select>
       </div>
+      ${isNew ? '' : renderAuditSection(lead)}
       ${isNew ? '' : `
       <div class="field-row"><label>Activity Log</label></div>
       <div class="activity-list">
@@ -310,10 +311,81 @@ async function openLeadModal(id){
       await loadLeads();
       render();
     };
+    const runAuditBtn = document.getElementById('runAuditBtn');
+    if (runAuditBtn) runAuditBtn.onclick = async () => {
+      runAuditBtn.disabled = true;
+      runAuditBtn.textContent = 'Running…';
+      try {
+        await api('/leads/' + lead.id + '/audit', { method: 'POST' });
+        pollAudit(lead.id);
+      } catch (e) {
+        alert(e.message);
+        runAuditBtn.disabled = false;
+        runAuditBtn.textContent = 'Run Audit';
+      }
+    };
+    const viewMockupBtn = document.getElementById('viewMockupBtn');
+    if (viewMockupBtn) viewMockupBtn.onclick = () => {
+      const blob = new Blob([lead.latest_audit.mockup_html], { type: 'text/html' });
+      window.open(URL.createObjectURL(blob), '_blank');
+    };
+    if (lead.latest_audit && lead.latest_audit.status === 'running') pollAudit(lead.id);
   }
 }
 
-function closeModal(){ document.getElementById('modalRoot').innerHTML = ''; }
+function renderAuditSection(lead){
+  const audit = lead.latest_audit;
+  const socials = lead.socials || [];
+  let html = `<div class="field-row"><label>Website Audit</label></div>`;
+  const running = audit && audit.status === 'running';
+  html += `<button class="btn block" id="runAuditBtn" ${(!lead.website || running) ? 'disabled' : ''}>${running ? 'Running…' : 'Run Audit'}</button>`;
+  if (!lead.website) html += `<p style="font-size:0.78rem;color:var(--muted);margin-bottom:0;">Add a website above first.</p>`;
+
+  if (socials.length) {
+    html += `<div style="margin-top:10px;">` + socials.map(s =>
+      `<span class="badge" style="margin-right:6px;">${escapeHtml(s.platform)}: ${escapeHtml(s.verification_status)}${s.url ? ` <a href="${escapeHtml(s.url)}" target="_blank" rel="noopener">↗</a>` : ''}</span>`
+    ).join('') + `</div>`;
+  }
+
+  if (audit) {
+    if (running) {
+      html += `<p style="font-size:0.82rem;color:var(--muted);margin-top:10px;">Analyzing site and generating mockup…</p>`;
+    } else if (audit.status === 'failed') {
+      html += `<p style="color:var(--rust);font-size:0.85rem;margin-top:10px;">Audit failed. Try again.</p>`;
+    } else if (audit.status === 'done') {
+      html += `<div style="margin-top:10px;">`;
+      if (audit.weaknesses && audit.weaknesses.length) {
+        html += `<div style="font-family:'Courier New',monospace;font-size:0.68rem;text-transform:uppercase;color:var(--muted);margin-bottom:4px;">Weaknesses Found</div>`;
+        html += `<ul style="font-size:0.85rem;margin:0 0 10px 18px;padding:0;">` + audit.weaknesses.map(w => `<li>${escapeHtml(w)}</li>`).join('') + `</ul>`;
+      }
+      if (audit.recommendations_text) {
+        html += `<div style="font-size:0.85rem;white-space:pre-wrap;background:#fff;border:1px solid var(--line);border-radius:6px;padding:10px;margin-bottom:10px;">${escapeHtml(audit.recommendations_text)}</div>`;
+      }
+      if (audit.mockup_html) {
+        html += `<button class="btn small secondary" id="viewMockupBtn">View Mockup</button>`;
+      }
+      html += `</div>`;
+    }
+  }
+  return html;
+}
+
+let auditPollTimer = null;
+function pollAudit(id){
+  if (auditPollTimer) clearTimeout(auditPollTimer);
+  auditPollTimer = setTimeout(async () => {
+    try {
+      const report = await api('/leads/' + id + '/audit');
+      if (report.status === 'running') pollAudit(id);
+      else openLeadModal(id);
+    } catch (e) { /* stop polling on error */ }
+  }, 3000);
+}
+
+function closeModal(){
+  if (auditPollTimer) { clearTimeout(auditPollTimer); auditPollTimer = null; }
+  document.getElementById('modalRoot').innerHTML = '';
+}
 
 document.querySelectorAll('nav.tabs button').forEach(btn => {
   btn.onclick = () => { state.activeTab = btn.dataset.tab; render(); };

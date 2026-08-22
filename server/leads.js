@@ -1,6 +1,8 @@
 const express = require('express');
 const { pool } = require('./db');
 const { searchPlaces } = require('./places');
+const { discoverAndVerifySocials } = require('./social');
+const { runAudit } = require('./audit');
 
 const router = express.Router();
 
@@ -24,12 +26,13 @@ router.get('/:id', async (req, res, next) => {
     const lead = rows[0];
     if (!lead) return res.status(404).json({ error: 'Not found' });
 
-    const [activity, socials] = await Promise.all([
+    const [activity, socials, audits] = await Promise.all([
       pool.query('SELECT id, author, text, created_at FROM activity_log WHERE lead_id = $1 ORDER BY created_at DESC', [lead.id]),
       pool.query('SELECT platform, url, verification_status, verified_via, verified_at FROM lead_socials WHERE lead_id = $1', [lead.id]),
+      pool.query('SELECT * FROM audit_reports WHERE lead_id = $1 ORDER BY created_at DESC LIMIT 1', [lead.id]),
     ]);
 
-    res.json({ ...lead, activity: activity.rows, socials: socials.rows });
+    res.json({ ...lead, activity: activity.rows, socials: socials.rows, latest_audit: audits.rows[0] || null });
   } catch (err) { next(err); }
 });
 
@@ -155,5 +158,67 @@ router.post('/import/places', async (req, res, next) => {
     res.json({ created, duplicates, query: `${businessType || 'plumber'} in ${location}` });
   } catch (err) { next(err); }
 });
+
+// The single audit-trigger button: kicks off social discovery/verification
+// and audit+mockup generation together. Both are slow (site fetches, LLM
+// calls), so this responds immediately with a "running" report and does the
+// work in the background; the frontend polls GET /:id/audit for completion.
+router.post('/:id/audit', async (req, res, next) => {
+  try {
+    const { rows } = await pool.query('SELECT * FROM leads WHERE id = $1', [req.params.id]);
+    const lead = rows[0];
+    if (!lead) return res.status(404).json({ error: 'Not found' });
+    if (!lead.website) return res.status(400).json({ error: 'Lead has no website set' });
+
+    const { rows: reportRows } = await pool.query(
+      `INSERT INTO audit_reports (lead_id, status) VALUES ($1, 'running') RETURNING *`,
+      [lead.id]
+    );
+    const report = reportRows[0];
+    res.status(202).json(report);
+
+    processAudit(lead, report.id).catch(async (err) => {
+      console.error('Audit processing failed for lead', lead.id, err);
+      await pool.query(`UPDATE audit_reports SET status = 'failed' WHERE id = $1`, [report.id]).catch(() => {});
+    });
+  } catch (err) { next(err); }
+});
+
+router.get('/:id/audit', async (req, res, next) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT * FROM audit_reports WHERE lead_id = $1 ORDER BY created_at DESC LIMIT 1`,
+      [req.params.id]
+    );
+    if (!rows[0]) return res.status(404).json({ error: 'No audit yet' });
+    res.json(rows[0]);
+  } catch (err) { next(err); }
+});
+
+async function processAudit(lead, reportId) {
+  const socials = await discoverAndVerifySocials(lead.website, lead.phone, lead.address);
+  for (const [platform, result] of Object.entries(socials)) {
+    if (!result) continue;
+    await pool.query(
+      `INSERT INTO lead_socials (lead_id, platform, url, verification_status, verified_via, verified_at)
+       VALUES ($1, $2, $3, $4, $5, now())
+       ON CONFLICT (lead_id, platform) DO UPDATE SET
+         url = EXCLUDED.url, verification_status = EXCLUDED.verification_status,
+         verified_via = EXCLUDED.verified_via, verified_at = now()`,
+      [lead.id, platform, result.url, result.status, result.verified_via]
+    );
+  }
+
+  const { weaknesses, recommendations_text, mockup_html } = await runAudit(lead.business_name, lead.website);
+  await pool.query(
+    `UPDATE audit_reports SET status = 'done', weaknesses = $1, recommendations_text = $2, mockup_html = $3, generated_at = now()
+     WHERE id = $4`,
+    [JSON.stringify(weaknesses), recommendations_text, mockup_html, reportId]
+  );
+  await pool.query(
+    `UPDATE leads SET outreach_status = 'Mockup Generated', updated_at = now() WHERE id = $1 AND outreach_status = 'New'`,
+    [lead.id]
+  );
+}
 
 module.exports = router;
