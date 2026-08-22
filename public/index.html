@@ -3,1072 +3,305 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>Plumber Outreach — Field CRM</title>
+<title>Contractor CRM</title>
 <style>
   :root{
-    --ink:#1c2321;
-    --paper:#f7f5f0;
-    --brass:#a9762f;
-    --brass-dark:#7d5720;
-    --pipe:#2f5d62;
-    --pipe-dark:#1f4448;
-    --rust:#b5462f;
-    --ok:#3d7a4f;
-    --warn:#c98a1f;
-    --line:#d8d2c4;
-    --card:#ffffff;
-    --muted:#6b6558;
+    --ink:#1c2321; --paper:#f7f5f0; --brass:#a9762f; --brass-dark:#7d5720;
+    --pipe:#2f5d62; --pipe-dark:#1f4448; --rust:#b5462f; --ok:#3d7a4f;
+    --warn:#c98a1f; --line:#d8d2c4; --card:#ffffff; --muted:#6b6558;
     font-size:16px;
   }
   *{box-sizing:border-box;}
-  body{
-    margin:0;
-    font-family:'Georgia',serif;
-    background:var(--paper);
-    color:var(--ink);
-    -webkit-tap-highlight-color:transparent;
-  }
+  body{margin:0;font-family:'Georgia',serif;background:var(--paper);color:var(--ink);}
   .mono{font-family:'Courier New',monospace;}
   header.app{
-    position:sticky;top:0;z-index:50;
-    background:var(--pipe-dark);
-    color:var(--paper);
-    padding:14px 16px 12px;
-    border-bottom:4px solid var(--brass);
+    position:sticky;top:0;z-index:50;background:var(--pipe-dark);color:var(--paper);
+    padding:14px 16px 12px;border-bottom:4px solid var(--brass);
+    display:flex;justify-content:space-between;align-items:flex-start;
   }
-  header.app h1{
-    margin:0;
-    font-size:1.15rem;
-    letter-spacing:0.04em;
-    font-weight:700;
-    display:flex;align-items:center;gap:8px;
-  }
-  header.app .sub{font-family:'Courier New',monospace;font-size:0.72rem;opacity:0.75;margin-top:2px;letter-spacing:0.03em;}
-  nav.tabs{
-    display:flex;gap:4px;padding:8px 10px 0;
-    background:var(--pipe-dark);
-    overflow-x:auto;
-  }
-  nav.tabs button{
-    flex:0 0 auto;
-    background:transparent;
-    border:none;
-    color:var(--paper);
-    opacity:0.55;
-    font-family:'Courier New',monospace;
-    font-size:0.78rem;
-    letter-spacing:0.03em;
-    padding:10px 12px 12px;
-    border-bottom:3px solid transparent;
-    cursor:pointer;
-  }
+  header.app h1{margin:0;font-size:1.15rem;letter-spacing:0.04em;font-weight:700;}
+  header.app button.logout{background:none;border:1px solid var(--paper);color:var(--paper);
+    border-radius:4px;padding:5px 10px;font-family:'Courier New',monospace;font-size:0.7rem;cursor:pointer;opacity:0.8;}
+  nav.tabs{display:flex;gap:4px;padding:8px 10px 0;background:var(--pipe-dark);overflow-x:auto;}
+  nav.tabs button{flex:0 0 auto;background:transparent;border:none;color:var(--paper);opacity:0.55;
+    font-family:'Courier New',monospace;font-size:0.78rem;letter-spacing:0.03em;padding:10px 12px 12px;
+    border-bottom:3px solid transparent;cursor:pointer;}
   nav.tabs button.active{opacity:1;border-bottom-color:var(--brass);color:#fff;}
-  main{padding:14px;max-width:720px;margin:0 auto;padding-bottom:80px;}
+  main{padding:14px;max-width:720px;margin:0 auto;padding-bottom:60px;}
 
-  /* Summary bar */
-  .summary-grid{
-    display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px;
-  }
-  .stat{
-    background:var(--card);border:1px solid var(--line);border-radius:6px;
-    padding:10px 8px;text-align:center;
-  }
-  .stat .n{font-size:1.4rem;font-weight:700;color:var(--pipe-dark);font-family:'Courier New',monospace;}
-  .stat .l{font-size:0.62rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted);margin-top:2px;}
-  .conv-row{display:flex;gap:8px;margin-bottom:16px;}
-  .conv{
-    flex:1;background:var(--card);border:1px solid var(--line);border-radius:6px;
-    padding:8px;text-align:center;
-  }
-  .conv .pct{font-size:1.1rem;font-weight:700;font-family:'Courier New',monospace;color:var(--brass-dark);}
-  .conv .lbl{font-size:0.6rem;text-transform:uppercase;color:var(--muted);letter-spacing:0.04em;}
-
-  /* Search/filter */
   .toolbar{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;}
-  input[type=text],input[type=search],select,textarea{
-    font-family:'Georgia',serif;
-    border:1px solid var(--line);
-    border-radius:5px;
-    padding:9px 10px;
-    font-size:0.9rem;
-    background:#fff;
-    color:var(--ink);
-  }
-  .toolbar input[type=search]{flex:1;min-width:140px;}
-  .toolbar select{flex:0 0 auto;}
-  .btn{
-    display:inline-flex;align-items:center;justify-content:center;gap:6px;
-    background:var(--pipe);color:#fff;border:none;border-radius:5px;
-    padding:10px 14px;font-family:'Courier New',monospace;font-size:0.78rem;
-    letter-spacing:0.03em;cursor:pointer;text-transform:uppercase;font-weight:700;
-  }
-  .btn.secondary{background:transparent;color:var(--pipe-dark);border:1px solid var(--pipe);}
+  .toolbar input, .toolbar select{flex:1;min-width:120px;padding:8px;border:1px solid var(--line);border-radius:6px;font-family:inherit;}
+  .btn{display:inline-block;background:var(--pipe);color:#fff;border:none;border-radius:6px;
+    padding:9px 14px;font-family:'Courier New',monospace;font-size:0.78rem;cursor:pointer;text-align:center;}
+  .btn.block{display:block;width:100%;}
   .btn.brass{background:var(--brass);}
   .btn.rust{background:var(--rust);}
-  .btn.small{padding:6px 10px;font-size:0.68rem;}
-  .btn.block{width:100%;}
-  .btn:disabled{opacity:0.4;}
+  .btn.secondary{background:#fff;color:var(--pipe-dark);border:1px solid var(--line);}
+  .btn.small{padding:5px 9px;font-size:0.68rem;}
 
-  /* Lead cards */
-  .section-label{
-    font-family:'Courier New',monospace;font-size:0.7rem;text-transform:uppercase;
-    letter-spacing:0.06em;color:var(--muted);margin:18px 0 8px;
-    border-bottom:1px solid var(--line);padding-bottom:4px;
-    display:flex;justify-content:space-between;
-  }
-  .lead-card{
-    background:var(--card);border:1px solid var(--line);border-radius:8px;
-    padding:12px 14px;margin-bottom:10px;position:relative;
-    border-left:5px solid var(--pipe);
-  }
-  .lead-card.laneB{border-left-color:var(--rust);}
-  .lead-card.blocked{border-left-color:#8a8577;}
-  .lead-card .top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;}
-  .lead-card .name{font-weight:700;font-size:1rem;}
-  .lead-card .dm{font-size:0.8rem;color:var(--muted);margin-top:1px;}
-  .lead-card .score{
-    font-family:'Courier New',monospace;font-weight:700;font-size:0.95rem;
-    color:var(--pipe-dark);flex:0 0 auto;
-  }
-  .lead-card .score.neg{color:var(--rust);}
-  .badges{display:flex;gap:5px;flex-wrap:wrap;margin-top:7px;}
-  .badge{
-    font-family:'Courier New',monospace;font-size:0.62rem;text-transform:uppercase;
-    padding:3px 7px;border-radius:10px;letter-spacing:0.03em;font-weight:700;
-  }
-  .badge.status{background:#eee7d6;color:var(--brass-dark);}
-  .badge.gate{background:#f3d9d0;color:var(--rust);}
-  .badge.due{background:#fbe4b8;color:var(--warn);}
-  .badge.overdue{background:var(--rust);color:#fff;}
-  .badge.lane-a{background:#d9e9dd;color:var(--ok);}
-  .badge.lane-b{background:#eee0d8;color:var(--rust);}
-  .lead-card .actions{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;}
-  .lead-card a.call{
-    text-decoration:none;
-  }
-  .social-row{display:flex;gap:6px;margin-top:8px;}
-  .social-icon{
-    width:30px;height:30px;border-radius:6px;display:flex;align-items:center;justify-content:center;
-    text-decoration:none;font-size:0.95rem;border:1px solid var(--line);background:#fff;color:var(--pipe-dark);
-  }
-  .social-icon.fb{color:#1877F2;border-color:#1877F2;}
-  .social-icon.ig{color:#C13584;border-color:#C13584;}
-  .social-icon.x{color:#111;border-color:#111;}
-  .social-icon.missing{opacity:0.3;pointer-events:none;}
-  .badge.dm{background:#dbe6ee;color:var(--pipe-dark);}
-  .badge.email{background:#eee7d6;color:var(--brass-dark);}
-  .badge.calldue{background:var(--warn);color:#fff;}
-  .badge.callover{background:var(--rust);color:#fff;}
+  .lead-card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin-bottom:10px;cursor:pointer;}
+  .lead-card h3{margin:0 0 4px;font-size:1rem;}
+  .lead-card .meta{font-size:0.78rem;color:var(--muted);font-family:'Courier New',monospace;}
+  .badge{display:inline-block;font-family:'Courier New',monospace;font-size:0.62rem;padding:3px 7px;
+    border-radius:4px;background:var(--line);color:var(--ink);text-transform:uppercase;margin-top:6px;}
+  .badge.New{background:#dbe6ee;} .badge.Responded{background:#d9ecd9;}
+  .badge.Declined{background:#f3d9d3;} .badge.Sent{background:#eee7d6;}
 
-  .social-edit-row{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
-  .social-edit-row .plat{width:70px;flex:0 0 auto;font-family:'Courier New',monospace;font-size:0.7rem;text-transform:uppercase;color:var(--muted);}
-  .social-edit-row input{flex:1;}
-  .findlink{font-family:'Courier New',monospace;font-size:0.62rem;color:var(--pipe);text-decoration:underline;white-space:nowrap;flex:0 0 auto;}
+  .empty{text-align:center;padding:40px 20px;color:var(--muted);}
 
-  .outreach-log{border:1px solid var(--line);border-radius:6px;background:#fff;padding:8px 10px;margin-bottom:10px;}
-  .outreach-entry{display:flex;justify-content:space-between;font-size:0.78rem;padding:4px 0;border-bottom:1px solid var(--line);}
-  .outreach-entry:last-child{border-bottom:none;}
-  .outreach-entry .ot{font-family:'Courier New',monospace;color:var(--muted);}
-  .outreach-btns{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;}
-  .next-action-box{
-    background:#fbf7ec;border:1px solid var(--warn);border-radius:6px;padding:8px 12px;margin-bottom:12px;
-    font-size:0.82rem;display:flex;justify-content:space-between;align-items:center;
-  }
-  .next-action-box.overdue{border-color:var(--rust);background:#fbeae6;}
-
-  /* empty state */
-  .empty{
-    text-align:center;padding:40px 20px;color:var(--muted);
-    font-family:'Courier New',monospace;font-size:0.85rem;
-  }
-
-  /* Modal / detail */
-  .overlay{
-    position:fixed;inset:0;background:rgba(28,35,33,0.55);z-index:100;
-    display:flex;align-items:flex-end;justify-content:center;
-  }
-  .sheet{
-    background:var(--paper);width:100%;max-width:720px;max-height:92vh;overflow-y:auto;
-    border-radius:14px 14px 0 0;padding:18px 16px 30px;
-    animation:slideup 0.22s ease-out;
-  }
-  @keyframes slideup{from{transform:translateY(30px);opacity:0;}to{transform:translateY(0);opacity:1;}}
-  .sheet-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;}
-  .sheet-header h2{margin:0;font-size:1.15rem;}
-  .close-x{background:none;border:none;font-size:1.4rem;color:var(--muted);cursor:pointer;line-height:1;}
-  .field-row{margin-bottom:12px;}
-  .field-row label{
-    display:block;font-family:'Courier New',monospace;font-size:0.65rem;
-    text-transform:uppercase;letter-spacing:0.05em;color:var(--muted);margin-bottom:4px;
-  }
-  .field-row input, .field-row select, .field-row textarea{width:100%;}
-  .field-row textarea{min-height:60px;font-family:'Georgia',serif;resize:vertical;}
-  .two-col{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
-
-  .checklist{margin-bottom:6px;}
-  .check-item{
-    display:flex;align-items:center;gap:10px;padding:9px 4px;border-bottom:1px solid var(--line);
-  }
-  .check-item:last-child{border-bottom:none;}
-  .check-item .cw{
-    font-family:'Courier New',monospace;font-size:0.7rem;color:var(--muted);width:34px;text-align:right;flex:0 0 auto;
-  }
-  .check-item label{flex:1;font-size:0.88rem;cursor:pointer;}
-  .check-item input[type=checkbox]{width:19px;height:19px;flex:0 0 auto;}
-  .lever-state-btns{display:flex;gap:4px;flex:0 0 auto;}
-  .lever-state-btns button{
-    font-family:'Courier New',monospace;font-size:0.62rem;padding:5px 7px;border-radius:4px;
-    border:1px solid var(--line);background:#fff;color:var(--muted);cursor:pointer;text-transform:uppercase;
-  }
-  .lever-state-btns button.on{background:var(--pipe);color:#fff;border-color:var(--pipe);}
-  .lever-state-btns button.done-on{background:var(--ok);color:#fff;border-color:var(--ok);}
-
-  .edit-list-row{display:flex;gap:6px;align-items:center;margin-bottom:6px;}
-  .edit-list-row input[type=text]{flex:1;}
-  .edit-list-row input[type=number]{width:60px;}
-  .edit-list-row button{flex:0 0 auto;}
-
-  .followup-box{
-    background:#fbf7ec;border:1px solid var(--brass);border-radius:6px;padding:10px 12px;margin-bottom:14px;
-  }
-  .followup-box .fu-row{display:flex;justify-content:space-between;align-items:center;font-size:0.82rem;padding:4px 0;}
-  .followup-box .fu-row .fu-date{font-family:'Courier New',monospace;color:var(--muted);}
-
-  .import-area textarea{width:100%;min-height:120px;font-family:'Courier New',monospace;font-size:0.8rem;}
+  .import-area textarea{width:100%;min-height:120px;font-family:'Courier New',monospace;font-size:0.8rem;padding:8px;}
   .dup-list{max-height:200px;overflow-y:auto;border:1px solid var(--line);border-radius:6px;padding:8px;background:#fff;margin-top:8px;}
-  .dup-row{display:flex;justify-content:space-between;align-items:center;padding:6px 4px;font-size:0.82rem;border-bottom:1px solid var(--line);}
+  .dup-row{display:flex;justify-content:space-between;padding:6px 4px;font-size:0.82rem;border-bottom:1px solid var(--line);}
   .dup-row:last-child{border-bottom:none;}
 
-  footer.tabbar{
-    position:fixed;bottom:0;left:0;right:0;background:var(--pipe-dark);
-    display:flex;border-top:3px solid var(--brass);z-index:60;
-  }
-  footer.tabbar button{
-    flex:1;background:none;border:none;color:var(--paper);opacity:0.55;
-    padding:10px 4px 8px;font-family:'Courier New',monospace;font-size:0.62rem;
-    text-transform:uppercase;letter-spacing:0.03em;cursor:pointer;
-  }
-  footer.tabbar button.active{opacity:1;color:var(--brass);}
-  footer.tabbar button .ic{display:block;font-size:1.1rem;margin-bottom:2px;}
+  .modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:100;display:flex;align-items:flex-end;}
+  .modal{background:var(--paper);width:100%;max-height:90vh;overflow-y:auto;border-radius:14px 14px 0 0;padding:18px;}
+  .field-row{margin-bottom:12px;}
+  .field-row label{display:block;font-family:'Courier New',monospace;font-size:0.68rem;text-transform:uppercase;color:var(--muted);margin-bottom:4px;}
+  .field-row input, .field-row select{width:100%;padding:8px;border:1px solid var(--line);border-radius:6px;font-family:inherit;}
+  .modal-actions{display:flex;gap:8px;margin-top:16px;}
+
+  .activity-list{margin-top:8px;}
+  .activity-entry{border-bottom:1px solid var(--line);padding:8px 0;font-size:0.85rem;}
+  .activity-entry .ts{font-family:'Courier New',monospace;font-size:0.65rem;color:var(--muted);}
+  .note-add{display:flex;gap:6px;margin-top:10px;}
+  .note-add input{flex:1;padding:8px;border:1px solid var(--line);border-radius:6px;}
 
   .loading-msg{text-align:center;padding:60px 20px;color:var(--muted);font-family:'Courier New',monospace;}
-  ::selection{background:var(--brass);color:#fff;}
 </style>
 </head>
 <body>
 
 <header class="app">
-  <h1>🔧 Plumber Outreach</h1>
-  <div class="sub" id="headerSub">loading…</div>
+  <div>
+    <h1>🔧 Contractor CRM</h1>
+  </div>
+  <button class="logout" id="logoutBtn">Log out</button>
 </header>
 
 <nav class="tabs">
-  <button data-tab="home" class="active">Pipeline</button>
-  <button data-tab="import">Load Leads</button>
-  <button data-tab="lists">Obstacles/Levers</button>
+  <button data-tab="leads" class="active">Leads</button>
+  <button data-tab="import">Import</button>
 </nav>
 
-<main id="mainArea">
-  <div class="loading-msg">Loading your data…</div>
-</main>
-
+<main id="mainArea"><div class="loading-msg">Loading…</div></main>
 <div id="modalRoot"></div>
 
 <script>
 (function(){
 
-// ---------- Config: default obstacle/lever libraries ----------
-const DEFAULT_OBSTACLES = [
-  {id:'o_gate', label:'Gatekeeper Screens Calls', weight:-2, hardBlock:false},
-  {id:'o_ans', label:'Already Has Answering Service', weight:-2, hardBlock:false},
-  {id:'o_family', label:'Family Member Handles Office/Tech', weight:0, hardBlock:true},
-  {id:'o_skeptic', label:'Skeptical of AI / Tech-Averse', weight:-2, hardBlock:false},
-  {id:'o_busy', label:'Too Busy / Hard to Get Time With', weight:-1, hardBlock:false},
-  {id:'o_burned', label:'Bad Past Experience with Sales/Tech Vendors', weight:-2, hardBlock:false},
-  {id:'o_lowvol', label:'Low Call Volume / Not Urgent Enough', weight:-1, hardBlock:false},
-];
-const DEFAULT_LEVERS = [
-  {id:'l_warm', label:'Warm Intro / Referral Path', weight:3},
-  {id:'l_direct', label:'Direct Line to Decision Maker', weight:2},
-  {id:'l_case', label:'Case Study/Review Ready to Show', weight:2},
-  {id:'l_trial', label:'Free Trial Framing Ready', weight:2},
-  {id:'l_sched', label:'Follow-Up Call Scheduled', weight:1},
-  {id:'l_sent', label:'Text/Email Sent, Awaiting Reply', weight:1},
-];
+const OUTREACH_STATUSES = ['New','Mockup Generated','Sent to Prospect','Followed Up','Responded','Declined'];
 
-const STATUS_STAGES = [
-  'Untouched','Contacted','Agreed','Setup Complete',
-  '2-Week Check-In Done','Review Received','Referral Received',
-  'Upsell Touch Done','Paying Client','Dead'
-];
+let state = { leads: [], activeTab: 'leads', filterStatus: 'all', searchQuery: '' };
 
-const STORAGE_KEY = 'leads_v1';
-const OBSTACLES_KEY = 'obstacles_v1';
-const LEVERS_KEY = 'levers_v1';
-
-let state = {
-  leads: [],
-  obstacles: DEFAULT_OBSTACLES,
-  levers: DEFAULT_LEVERS,
-  activeTab: 'home',
-  filterStatus: 'all',
-  filterLane: 'all',
-  searchQuery: '',
-};
-
-function uid(){ return 'lead_' + Math.random().toString(36).slice(2,10) + Date.now().toString(36); }
-
-// ---------- Persistence ----------
-async function loadAll(){
-  try{
-    const l = localStorage.getItem(STORAGE_KEY);
-    state.leads = l ? JSON.parse(l) : [];
-  }catch(e){ state.leads = []; }
-  try{
-    const o = localStorage.getItem(OBSTACLES_KEY);
-    state.obstacles = o ? JSON.parse(o) : DEFAULT_OBSTACLES;
-  }catch(e){ state.obstacles = DEFAULT_OBSTACLES; }
-  try{
-    const lv = localStorage.getItem(LEVERS_KEY);
-    state.levers = lv ? JSON.parse(lv) : DEFAULT_LEVERS;
-  }catch(e){ state.levers = DEFAULT_LEVERS; }
-}
-async function saveLeads(){
-  try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state.leads)); }catch(e){ console.error('save failed',e); }
-}
-async function saveObstacles(){
-  try{ localStorage.setItem(OBSTACLES_KEY, JSON.stringify(state.obstacles)); }catch(e){}
-}
-async function saveLevers(){
-  try{ localStorage.setItem(LEVERS_KEY, JSON.stringify(state.levers)); }catch(e){}
-}
-
-// ---------- Scoring ----------
-function computeScore(lead){
-  let score = 0;
-  let hardBlocked = false;
-  state.obstacles.forEach(o=>{
-    if(lead.obstacles && lead.obstacles[o.id]){
-      score += o.weight;
-      if(o.hardBlock) hardBlocked = true;
-    }
+async function api(path, opts) {
+  const res = await fetch('/api' + path, {
+    headers: {'Content-Type':'application/json'},
+    ...opts,
   });
-  // competitor-rebate style halving rule kept generic: if 'o_burned' active and no 'l_case' active, no special rule needed here.
-  state.levers.forEach(lv=>{
-    const st = (lead.levers && lead.levers[lv.id]) || 'na'; // 'open','active','done','na'
-    if(st === 'open' || st === 'active'){
-      score += lv.weight;
-    }
-  });
-  return {score, hardBlocked};
-}
-function laneFor(lead){
-  const {score, hardBlocked} = computeScore(lead);
-  if(hardBlocked) return 'B';
-  return score >= 0 ? 'A' : 'B';
-}
-
-// ---------- Follow-up date helpers ----------
-function addDays(dateStr, days){
-  const d = new Date(dateStr);
-  d.setDate(d.getDate()+days);
-  return d.toISOString().slice(0,10);
-}
-function todayStr(){ return new Date().toISOString().slice(0,10); }
-function fmtDate(d){
-  if(!d) return '—';
-  const dt = new Date(d+'T00:00:00');
-  return dt.toLocaleDateString('en-US',{month:'short',day:'numeric'});
-}
-function dueStatus(dateStr){
-  if(!dateStr) return null;
-  const today = todayStr();
-  if(dateStr < today) return 'overdue';
-  if(dateStr === today) return 'due';
-  return null;
-}
-
-// ---------- Dedup helpers ----------
-function normName(s){
-  return (s||'').toLowerCase().replace(/[^a-z0-9]/g,'');
-}
-function normPhone(s){
-  return (s||'').replace(/[^0-9]/g,'').slice(-10);
-}
-function findDuplicate(name, phone){
-  const nn = normName(name);
-  const np = normPhone(phone);
-  return state.leads.find(l=>{
-    const ln = normName(l.name);
-    const lp = normPhone(l.phone);
-    if(np && lp && np === lp) return true;
-    if(nn && ln && nn === ln) return true;
-    return false;
-  });
-}
-
-// ---------- Rendering ----------
-function render(){
-  document.querySelectorAll('nav.tabs button').forEach(b=>{
-    b.classList.toggle('active', b.dataset.tab === state.activeTab);
-  });
-  const main = document.getElementById('mainArea');
-  if(state.activeTab === 'home') main.innerHTML = renderHome();
-  else if(state.activeTab === 'import') main.innerHTML = renderImport();
-  else if(state.activeTab === 'lists') main.innerHTML = renderLists();
-
-  document.getElementById('headerSub').textContent =
-    state.leads.length + ' leads tracked · Cincinnati plumbers';
-
-  attachHomeHandlers();
-  attachImportHandlers();
-  attachListsHandlers();
-}
-
-function renderSummary(){
-  const total = state.leads.length;
-  const contacted = state.leads.filter(l=>l.status!=='Untouched').length;
-  const reviews = state.leads.filter(l=>l.reviewReceived).length;
-  const referrals = state.leads.filter(l=>l.referralReceived).length;
-  const upsellYes = state.leads.filter(l=>l.upsellInterest==='yes').length;
-  const setupsDone = state.leads.filter(l=>{
-    const idx = STATUS_STAGES.indexOf(l.status);
-    return idx >= STATUS_STAGES.indexOf('Setup Complete');
-  }).length;
-  const pct = (num, den)=> den>0 ? Math.round(100*num/den)+'%' : '—';
-
-  return `
-  <div class="summary-grid">
-    <div class="stat"><div class="n">${total}</div><div class="l">Total Leads</div></div>
-    <div class="stat"><div class="n">${contacted}</div><div class="l">Contacted</div></div>
-    <div class="stat"><div class="n">${setupsDone}</div><div class="l">Setups Done</div></div>
-  </div>
-  <div class="conv-row">
-    <div class="conv"><div class="pct">${pct(reviews,setupsDone)}</div><div class="lbl">Review Rate</div></div>
-    <div class="conv"><div class="pct">${pct(referrals,setupsDone)}</div><div class="lbl">Referral Rate</div></div>
-    <div class="conv"><div class="pct">${pct(upsellYes,setupsDone)}</div><div class="lbl">Upsell Rate</div></div>
-  </div>`;
-}
-
-function leadFollowups(lead){
-  const list = [];
-  if(lead.setupDate){
-    const twoWk = addDays(lead.setupDate, 14);
-    const upsellDue = addDays(lead.setupDate, 49); // ~7 weeks, mid of 6-8wk window
-    const twoWkDone = STATUS_STAGES.indexOf(lead.status) >= STATUS_STAGES.indexOf('2-Week Check-In Done');
-    const upsellDone = STATUS_STAGES.indexOf(lead.status) >= STATUS_STAGES.indexOf('Upsell Touch Done');
-    if(!twoWkDone) list.push({label:'2-Week Check-In', date: twoWk});
-    if(!upsellDone) list.push({label:'6-8wk Upsell Touch', date: upsellDue});
+  if (res.status === 401) { window.location.href = '/login.html'; throw new Error('unauthenticated'); }
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error || ('Request failed: ' + res.status));
   }
-  return list;
-}
-
-function renderLeadCard(lead){
-  const {score} = computeScore(lead);
-  const lane = laneFor(lead);
-  const gate = lead.obstacles && lead.obstacles['o_gate'];
-  const fus = leadFollowups(lead);
-  let dueBadge = '';
-  fus.forEach(fu=>{
-    const ds = dueStatus(fu.date);
-    if(ds === 'overdue') dueBadge += `<span class="badge overdue">⚠ ${fu.label} overdue</span>`;
-    else if(ds === 'due') dueBadge += `<span class="badge due">${fu.label} due today</span>`;
-  });
-  const telHref = lead.phone ? `tel:${lead.phone.replace(/[^0-9+]/g,'')}` : null;
-  const s = lead.socials || {};
-
-  const na = nextAction(lead);
-  let naBadge = '';
-  if(na){
-    if(na.state==='overdue') naBadge = `<span class="badge callover">⚠ ${escapeHtml(na.label)}</span>`;
-    else if(na.state==='due') naBadge = `<span class="badge calldue">${escapeHtml(na.label)}</span>`;
-    else if(na.state==='todo') naBadge = `<span class="badge ${hasAnySocial(lead)?'dm':'email'}">${escapeHtml(na.label)}</span>`;
-  }
-
-  return `
-  <div class="lead-card ${lane==='B'?'laneB':''}" data-id="${lead.id}">
-    <div class="top">
-      <div>
-        <div class="name">${escapeHtml(lead.name)}</div>
-        <div class="dm">${escapeHtml(lead.decisionMaker||'No DM set')}</div>
-      </div>
-      <div class="score ${score<0?'neg':''}">${score>=0?'+':''}${score}</div>
-    </div>
-    <div class="badges">
-      <span class="badge status">${lead.status}</span>
-      <span class="badge ${lane==='A'?'lane-a':'lane-b'}">Lane ${lane}</span>
-      ${gate?'<span class="badge gate">Gatekeeper</span>':''}
-      ${dueBadge}
-      ${naBadge}
-    </div>
-    <div class="social-row">
-      <a class="social-icon fb ${s.facebook?'':'missing'}" href="${s.facebook||'#'}" target="_blank" rel="noopener" title="Facebook">f</a>
-      <a class="social-icon ig ${s.instagram?'':'missing'}" href="${s.instagram||'#'}" target="_blank" rel="noopener" title="Instagram">◎</a>
-      <a class="social-icon x ${s.x?'':'missing'}" href="${s.x||'#'}" target="_blank" rel="noopener" title="X / Twitter">𝕏</a>
-    </div>
-    <div class="actions">
-      <button class="btn small" data-action="open" data-id="${lead.id}">Open</button>
-      ${telHref?`<a class="call" href="${telHref}"><button class="btn small brass" type="button">Call</button></a>`:''}
-      <button class="btn small secondary" data-action="quickstatus" data-id="${lead.id}">Advance Status</button>
-    </div>
-  </div>`;
+  if (res.status === 204) return null;
+  return res.json();
 }
 
 function escapeHtml(s){
-  if(!s) return '';
-  return s.replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  return (s||'').toString().replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
-function renderHome(){
-  let leads = state.leads.slice();
+async function loadLeads(){
+  state.leads = await api('/leads');
+}
 
-  if(state.searchQuery){
-    const q = state.searchQuery.toLowerCase();
-    leads = leads.filter(l=> (l.name||'').toLowerCase().includes(q) || (l.decisionMaker||'').toLowerCase().includes(q));
-  }
-  if(state.filterStatus !== 'all'){
-    leads = leads.filter(l=> l.status === state.filterStatus);
-  }
-  if(state.filterLane !== 'all'){
-    leads = leads.filter(l=> laneFor(l) === state.filterLane);
-  }
+function filteredLeads(){
+  return state.leads.filter(l => {
+    if (state.filterStatus !== 'all' && l.outreach_status !== state.filterStatus) return false;
+    if (state.searchQuery && !l.business_name.toLowerCase().includes(state.searchQuery.toLowerCase())) return false;
+    return true;
+  });
+}
 
-  leads.sort((a,b)=> computeScore(b).score - computeScore(a).score);
+function render(){
+  const main = document.getElementById('mainArea');
+  document.querySelectorAll('nav.tabs button').forEach(b => b.classList.toggle('active', b.dataset.tab === state.activeTab));
+  if (state.activeTab === 'leads') main.innerHTML = renderLeads();
+  else main.innerHTML = renderImport();
+  attachHandlers();
+}
 
-  const overdue = leads.filter(l=> leadFollowups(l).some(fu=>dueStatus(fu.date)==='overdue'));
-  const dueToday = leads.filter(l=> !overdue.includes(l) && leadFollowups(l).some(fu=>dueStatus(fu.date)==='due'));
-  const rest = leads.filter(l=> !overdue.includes(l) && !dueToday.includes(l));
-
-  const statusOptions = ['all',...STATUS_STAGES].map(s=>`<option value="${s}" ${state.filterStatus===s?'selected':''}>${s==='all'?'All Statuses':s}</option>`).join('');
-
-  let html = renderSummary();
-  html += `
-  <div class="toolbar">
-    <input type="search" id="searchInput" placeholder="Search name or contact…" value="${escapeHtml(state.searchQuery)}">
-    <select id="statusFilter">${statusOptions}</select>
-    <select id="laneFilter">
-      <option value="all" ${state.filterLane==='all'?'selected':''}>All Lanes</option>
-      <option value="A" ${state.filterLane==='A'?'selected':''}>Lane A</option>
-      <option value="B" ${state.filterLane==='B'?'selected':''}>Lane B</option>
-    </select>
-  </div>
-  <button class="btn block brass" id="addLeadBtn" style="margin-bottom:6px;">+ Add Lead Manually</button>
+function renderLeads(){
+  const leads = filteredLeads();
+  let html = `
+    <div class="toolbar">
+      <input type="text" id="searchInput" placeholder="Search by name…" value="${escapeHtml(state.searchQuery)}">
+      <select id="statusFilter">
+        <option value="all">All statuses</option>
+        ${OUTREACH_STATUSES.map(s => `<option value="${s}" ${state.filterStatus===s?'selected':''}>${s}</option>`).join('')}
+      </select>
+    </div>
+    <button class="btn block brass" id="addLeadBtn" style="margin-bottom:14px;">+ Add Lead</button>
   `;
-
-  if(leads.length === 0){
-    html += `<div class="empty">No leads match. Try Load Leads to import your list.</div>`;
-    return html;
+  if (!leads.length) {
+    html += `<div class="empty">No leads match. Try the Import tab to load some.</div>`;
+  } else {
+    leads.forEach(l => {
+      html += `
+      <div class="lead-card" data-id="${l.id}">
+        <h3>${escapeHtml(l.business_name)}</h3>
+        <div class="meta">${escapeHtml(l.phone||'no phone')} · ${escapeHtml(l.address||'no address')}</div>
+        <span class="badge ${l.outreach_status.replace(/ .*/,'')}">${escapeHtml(l.outreach_status)}</span>
+      </div>`;
+    });
   }
-
-  if(overdue.length){
-    html += `<div class="section-label">⚠ Overdue Follow-Up <span>${overdue.length}</span></div>`;
-    overdue.forEach(l=> html += renderLeadCard(l));
-  }
-  if(dueToday.length){
-    html += `<div class="section-label">Due Today <span>${dueToday.length}</span></div>`;
-    dueToday.forEach(l=> html += renderLeadCard(l));
-  }
-  html += `<div class="section-label">All Leads (by score) <span>${rest.length}</span></div>`;
-  rest.forEach(l=> html += renderLeadCard(l));
-
   return html;
 }
 
 function renderImport(){
   return `
-  <div class="section-label">Paste Leads to Import</div>
-  <p style="font-size:0.82rem;color:var(--muted);">One lead per line. Format: <span class="mono">Name, Phone, Address</span> — phone and address optional. Works great pasting straight from a spreadsheet column (tab or comma separated).</p>
-  <div class="import-area">
-    <textarea id="importText" placeholder="Halpin Plumbing Inc, 513-790-6985, 5177 Fishwick Dr, Cincinnati OH&#10;Blue Chip Plumbing, 513-941-4010"></textarea>
-  </div>
-  <button class="btn block" id="previewImportBtn" style="margin-top:10px;">Preview Import</button>
-  <div id="importPreview"></div>
+  <div class="field-row"><label>Paste Leads to Import</label></div>
+  <p style="font-size:0.82rem;color:var(--muted);margin-top:-8px;">One lead per line: <span class="mono">Name, Phone, Address</span> — phone/address optional.</p>
+  <div class="import-area"><textarea id="importText" placeholder="Halpin Plumbing Inc, 513-790-6985, 5177 Fishwick Dr, Cincinnati OH"></textarea></div>
+  <button class="btn block" id="previewImportBtn" style="margin-top:10px;">Import</button>
+  <div id="importResult"></div>
   `;
 }
 
-function renderLists(){
-  let html = `<div class="section-label">Obstacles <span>weight</span></div>`;
-  state.obstacles.forEach((o,i)=>{
-    html += `
-    <div class="edit-list-row" data-otype="obstacle" data-idx="${i}">
-      <input type="text" class="o-label" value="${escapeHtml(o.label)}">
-      <input type="number" class="o-weight" value="${o.weight}">
-      <label style="font-size:0.65rem;font-family:'Courier New',monospace;display:flex;align-items:center;gap:3px;">
-        <input type="checkbox" class="o-hard" ${o.hardBlock?'checked':''}> block
-      </label>
-      <button class="btn small rust" data-action="del-obstacle" data-idx="${i}">✕</button>
-    </div>`;
-  });
-  html += `<button class="btn small secondary" id="addObstacleBtn" style="margin:6px 0 20px;">+ Add Obstacle</button>`;
-
-  html += `<div class="section-label">Levers <span>weight</span></div>`;
-  state.levers.forEach((lv,i)=>{
-    html += `
-    <div class="edit-list-row" data-ltype="lever" data-idx="${i}">
-      <input type="text" class="l-label" value="${escapeHtml(lv.label)}">
-      <input type="number" class="l-weight" value="${lv.weight}">
-      <button class="btn small rust" data-action="del-lever" data-idx="${i}">✕</button>
-    </div>`;
-  });
-  html += `<button class="btn small secondary" id="addLeverBtn" style="margin:6px 0 10px;">+ Add Lever</button>`;
-  html += `<button class="btn block brass" id="saveListsBtn" style="margin-top:16px;">Save Changes</button>`;
-  return html;
-}
-
-// ---------- Event wiring ----------
-function attachHomeHandlers(){
+function attachHandlers(){
   const search = document.getElementById('searchInput');
-  if(search) search.oninput = e=>{ state.searchQuery = e.target.value; render(); };
+  if (search) search.oninput = e => { state.searchQuery = e.target.value; render(); };
   const sf = document.getElementById('statusFilter');
-  if(sf) sf.onchange = e=>{ state.filterStatus = e.target.value; render(); };
-  const lf = document.getElementById('laneFilter');
-  if(lf) lf.onchange = e=>{ state.filterLane = e.target.value; render(); };
+  if (sf) sf.onchange = e => { state.filterStatus = e.target.value; render(); };
   const addBtn = document.getElementById('addLeadBtn');
-  if(addBtn) addBtn.onclick = ()=> openLeadModal(null);
-
-  document.querySelectorAll('[data-action="open"]').forEach(btn=>{
-    btn.onclick = ()=> openLeadModal(btn.dataset.id);
+  if (addBtn) addBtn.onclick = () => openLeadModal(null);
+  document.querySelectorAll('.lead-card').forEach(card => {
+    card.onclick = () => openLeadModal(card.dataset.id);
   });
-  document.querySelectorAll('[data-action="quickstatus"]').forEach(btn=>{
-    btn.onclick = ()=>{
-      const lead = state.leads.find(l=>l.id===btn.dataset.id);
-      const idx = STATUS_STAGES.indexOf(lead.status);
-      if(idx < STATUS_STAGES.length - 2){ // stop before Paying/Dead auto-advance
-        lead.status = STATUS_STAGES[idx+1];
-        if(lead.status === 'Setup Complete' && !lead.setupDate) lead.setupDate = todayStr();
-        saveLeads(); render();
-      }
-    };
-  });
-}
 
-function attachImportHandlers(){
-  const btn = document.getElementById('previewImportBtn');
-  if(!btn) return;
-  btn.onclick = ()=>{
+  const importBtn = document.getElementById('previewImportBtn');
+  if (importBtn) importBtn.onclick = async () => {
     const text = document.getElementById('importText').value;
-    const lines = text.split('\n').map(l=>l.trim()).filter(Boolean);
-    const parsed = lines.map(line=>{
-      const parts = line.split(/\t|,/).map(p=>p.trim());
-      return {
-        name: parts[0] || '',
-        phone: parts[1] || '',
-        address: parts.slice(2).join(', ') || '',
-      };
-    }).filter(p=>p.name);
-
-    const news = [];
-    const dups = [];
-    parsed.forEach(p=>{
-      const dup = findDuplicate(p.name, p.phone);
-      if(dup) dups.push({incoming:p, existing:dup});
-      else news.push(p);
-    });
-
-    let html = `<div class="dup-list"><strong style="font-size:0.85rem;">${news.length} new</strong> · <span style="color:var(--rust);font-size:0.85rem;">${dups.length} duplicate(s) skipped</span></div>`;
-    if(dups.length){
-      html += `<div class="dup-list">`;
-      dups.forEach(d=> html += `<div class="dup-row"><span>${escapeHtml(d.incoming.name)}</span><span style="color:var(--muted);">matches "${escapeHtml(d.existing.name)}"</span></div>`);
-      html += `</div>`;
-    }
-    html += `<button class="btn block brass" id="confirmImportBtn" style="margin-top:10px;">Import ${news.length} New Lead${news.length===1?'':'s'}</button>`;
-    document.getElementById('importPreview').innerHTML = html;
-
-    document.getElementById('confirmImportBtn').onclick = ()=>{
-      news.forEach(p=>{
-        state.leads.push(newLead(p.name, p.phone, p.address));
-      });
-      saveLeads();
+    if (!text.trim()) return;
+    importBtn.disabled = true;
+    try {
+      const result = await api('/leads/import', { method: 'POST', body: JSON.stringify({ text }) });
+      let html = `<p style="color:var(--ok);font-size:0.85rem;">✓ Imported ${result.created.length} new lead${result.created.length===1?'':'s'}.</p>`;
+      if (result.duplicates.length) {
+        html += `<div class="dup-list">`;
+        result.duplicates.forEach(d => html += `<div class="dup-row"><span>${escapeHtml(d.incoming.name)}</span><span style="color:var(--muted);">matches "${escapeHtml(d.existing.business_name)}"</span></div>`);
+        html += `</div>`;
+      }
+      document.getElementById('importResult').innerHTML = html;
       document.getElementById('importText').value = '';
-      document.getElementById('importPreview').innerHTML = `<p style="color:var(--ok);font-size:0.85rem;">✓ Imported ${news.length} leads.</p>`;
-      state.activeTab = 'home';
-      render();
-    };
+      await loadLeads();
+    } catch (e) {
+      document.getElementById('importResult').innerHTML = `<p style="color:var(--rust);">${escapeHtml(e.message)}</p>`;
+    }
+    importBtn.disabled = false;
   };
 }
 
-function attachListsHandlers(){
-  const addO = document.getElementById('addObstacleBtn');
-  if(addO) addO.onclick = ()=>{
-    state.obstacles.push({id:'o_'+Date.now(), label:'New Obstacle', weight:-1, hardBlock:false});
-    render();
-  };
-  const addL = document.getElementById('addLeverBtn');
-  if(addL) addL.onclick = ()=>{
-    state.levers.push({id:'l_'+Date.now(), label:'New Lever', weight:1});
-    render();
-  };
-  document.querySelectorAll('[data-action="del-obstacle"]').forEach(b=>{
-    b.onclick = ()=>{ state.obstacles.splice(parseInt(b.dataset.idx),1); render(); };
-  });
-  document.querySelectorAll('[data-action="del-lever"]').forEach(b=>{
-    b.onclick = ()=>{ state.levers.splice(parseInt(b.dataset.idx),1); render(); };
-  });
-  const saveBtn = document.getElementById('saveListsBtn');
-  if(saveBtn) saveBtn.onclick = async ()=>{
-    document.querySelectorAll('[data-otype="obstacle"]').forEach(row=>{
-      const idx = parseInt(row.dataset.idx);
-      state.obstacles[idx].label = row.querySelector('.o-label').value;
-      state.obstacles[idx].weight = parseInt(row.querySelector('.o-weight').value)||0;
-      state.obstacles[idx].hardBlock = row.querySelector('.o-hard').checked;
-    });
-    document.querySelectorAll('[data-ltype="lever"]').forEach(row=>{
-      const idx = parseInt(row.dataset.idx);
-      state.levers[idx].label = row.querySelector('.l-label').value;
-      state.levers[idx].weight = parseInt(row.querySelector('.l-weight').value)||0;
-    });
-    await saveObstacles();
-    await saveLevers();
-    saveBtn.textContent = 'Saved ✓';
-    setTimeout(()=>{ saveBtn.textContent='Save Changes'; },1200);
-  };
-}
-
-function newLead(name, phone, address){
-  return {
-    id: uid(),
-    name: name||'New Lead',
-    decisionMaker: '',
-    phone: phone||'',
-    email: '',
-    address: address||'',
-    status: 'Untouched',
-    source: 'Cold Outreach',
-    obstacles: {},
-    levers: {},
-    setupDate: null,
-    agreedDate: null,
-    reviewReceived: false,
-    reviewLink: '',
-    referralReceived: false,
-    upsellInterest: 'pending', // pending / yes / no
-    upsellIdeasDiscussed: '',
-    tradeNetworkNotes: '',
-    notes: '',
-    socials: { facebook:'', instagram:'', x:'' },
-    outreachLog: [], // {type:'dm'|'email'|'call'|'reply', date:'YYYY-MM-DD', time:'HH:MM'}
-  };
-}
-
-// ---------- Outreach / social helpers ----------
-function hasAnySocial(lead){
-  const s = lead.socials || {};
-  return !!(s.facebook || s.instagram || s.x);
-}
-function nowTimeStr(){
-  const d = new Date();
-  return d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
-}
-function logOutreach(lead, type){
-  if(!lead.outreachLog) lead.outreachLog = [];
-  lead.outreachLog.push({ type, date: todayStr(), time: nowTimeStr() });
-  // auto-advance status from Untouched on first contact
-  if(lead.status === 'Untouched') lead.status = 'Contacted';
-}
-function lastOutreachEntry(lead){
-  const log = lead.outreachLog || [];
-  return log.length ? log[log.length-1] : null;
-}
-// Determines the next recommended action per the DM -> wait 7d -> call,
-// or (no social) email -> wait 7d -> call, workflow.
-function nextAction(lead){
-  const log = lead.outreachLog || [];
-  if(!log.length){
-    return hasAnySocial(lead)
-      ? {label:'DM via social', state:'todo'}
-      : {label:'Send email', state:'todo'};
-  }
-  const last = log[log.length-1];
-  if(last.type === 'call' || last.type === 'reply'){
-    return null; // ball's in their court / handled manually from here
-  }
-  // last was 'dm' or 'email' — a call is due 7 days later
-  const dueDate = addDays(last.date, 7);
-  const today = todayStr();
-  if(today < dueDate){
-    return {label:`Call if no reply by ${fmtDate(dueDate)}`, state:'waiting', dueDate};
-  }
-  if(today === dueDate){
-    return {label:'Call — due today', state:'due', dueDate};
-  }
-  return {label:'Call — overdue', state:'overdue', dueDate};
-}
-
-// ---------- Lead detail modal ----------
-function openLeadModal(id){
+async function openLeadModal(id){
   const isNew = !id;
-  const lead = isNew ? newLead('') : state.leads.find(l=>l.id===id);
+  let lead = isNew
+    ? { id:null, business_name:'', phone:'', address:'', website:'', email:'', decision_maker:'', outreach_status:'New', activity: [] }
+    : await api('/leads/' + id);
+
   const root = document.getElementById('modalRoot');
-
-  const statusOpts = STATUS_STAGES.map(s=>`<option value="${s}" ${lead.status===s?'selected':''}>${s}</option>`).join('');
-
-  const obstacleRows = state.obstacles.map(o=>{
-    const checked = lead.obstacles && lead.obstacles[o.id];
-    return `
-    <div class="check-item">
-      <span class="cw">${o.weight}</span>
-      <label for="obs_${o.id}">${escapeHtml(o.label)}${o.hardBlock?' 🔒':''}</label>
-      <input type="checkbox" id="obs_${o.id}" data-obskey="${o.id}" ${checked?'checked':''}>
-    </div>`;
-  }).join('');
-
-  const leverRows = state.levers.map(lv=>{
-    const st = (lead.levers && lead.levers[lv.id]) || 'na';
-    return `
-    <div class="check-item">
-      <span class="cw">+${lv.weight}</span>
-      <label>${escapeHtml(lv.label)}</label>
-      <div class="lever-state-btns" data-leverkey="${lv.id}">
-        <button type="button" data-state="na" class="${st==='na'?'on':''}">N/A</button>
-        <button type="button" data-state="open" class="${st==='open'?'on':''}">Open</button>
-        <button type="button" data-state="active" class="${st==='active'?'on':''}">Active</button>
-        <button type="button" data-state="done" class="${st==='done'?'done-on':''}">Done</button>
-      </div>
-    </div>`;
-  }).join('');
-
-  const s = lead.socials || {facebook:'',instagram:'',x:''};
-  const q = encodeURIComponent(lead.name + ' ' + (lead.address||'') + ' plumbing');
-  const socialEditHtml = `
-    <div class="social-edit-row">
-      <span class="plat">Facebook</span>
-      <input type="text" id="soc_fb" placeholder="https://facebook.com/…" value="${escapeHtml(s.facebook)}">
-      <a class="findlink" target="_blank" rel="noopener" href="https://www.google.com/search?q=${q}+facebook">find →</a>
-    </div>
-    <div class="social-edit-row">
-      <span class="plat">Instagram</span>
-      <input type="text" id="soc_ig" placeholder="https://instagram.com/…" value="${escapeHtml(s.instagram)}">
-      <a class="findlink" target="_blank" rel="noopener" href="https://www.google.com/search?q=${q}+instagram">find →</a>
-    </div>
-    <div class="social-edit-row">
-      <span class="plat">X</span>
-      <input type="text" id="soc_x" placeholder="https://x.com/…" value="${escapeHtml(s.x)}">
-      <a class="findlink" target="_blank" rel="noopener" href="https://www.google.com/search?q=${q}+twitter">find →</a>
-    </div>`;
-
-  const na = nextAction(lead);
-  const naBoxHtml = na ? `
-    <div class="next-action-box ${na.state==='overdue'?'overdue':''}">
-      <span>${escapeHtml(na.label)}</span>
-    </div>` : '';
-
-  const log = lead.outreachLog || [];
-  const logHtml = log.length ? `
-    <div class="outreach-log">
-      ${log.slice().reverse().map(e=>`
-        <div class="outreach-entry">
-          <span>${e.type==='dm'?'DM sent':e.type==='email'?'Email sent':e.type==='call'?'Called':'Replied'}</span>
-          <span class="ot">${fmtDate(e.date)} · ${e.time}</span>
-        </div>`).join('')}
-    </div>` : `<p style="font-size:0.8rem;color:var(--muted);">No outreach logged yet.</p>`;
-
-  const fus = leadFollowups(lead);
-  const followupHtml = fus.length ? `
-    <div class="followup-box">
-      <strong style="font-size:0.75rem;font-family:'Courier New',monospace;text-transform:uppercase;">Upcoming Follow-Ups</strong>
-      ${fus.map(fu=>{
-        const ds = dueStatus(fu.date);
-        const tag = ds==='overdue' ? ' ⚠ overdue' : ds==='due' ? ' — due today' : '';
-        return `<div class="fu-row"><span>${fu.label}</span><span class="fu-date">${fmtDate(fu.date)}${tag}</span></div>`;
-      }).join('')}
-    </div>` : '';
-
   root.innerHTML = `
-  <div class="overlay" id="overlay">
-    <div class="sheet">
-      <div class="sheet-header">
-        <h2>${isNew ? 'New Lead' : 'Edit Lead'}</h2>
-        <button class="close-x" id="closeModal">&times;</button>
+  <div class="modal-backdrop" id="modalBackdrop">
+    <div class="modal">
+      <div class="field-row"><label>Business Name</label><input id="f_name" value="${escapeHtml(lead.business_name)}"></div>
+      <div class="field-row"><label>Phone</label><input id="f_phone" value="${escapeHtml(lead.phone)}"></div>
+      <div class="field-row"><label>Address</label><input id="f_address" value="${escapeHtml(lead.address)}"></div>
+      <div class="field-row"><label>Website</label><input id="f_website" value="${escapeHtml(lead.website)}"></div>
+      <div class="field-row"><label>Email</label><input id="f_email" value="${escapeHtml(lead.email)}"></div>
+      <div class="field-row"><label>Decision Maker</label><input id="f_dm" value="${escapeHtml(lead.decision_maker)}"></div>
+      <div class="field-row"><label>Outreach Status</label>
+        <select id="f_status">${OUTREACH_STATUSES.map(s => `<option value="${s}" ${lead.outreach_status===s?'selected':''}>${s}</option>`).join('')}</select>
       </div>
-
-      ${followupHtml}
-      ${naBoxHtml}
-
-      <div class="section-label">Social Profiles</div>
-      ${socialEditHtml}
-
-      <div class="section-label">Outreach Log</div>
-      ${logHtml}
-      <div class="outreach-btns">
-        <button type="button" class="btn small" id="logDmBtn">Log DM'd</button>
-        <button type="button" class="btn small brass" id="logEmailBtn">Log Emailed</button>
-        <button type="button" class="btn small secondary" id="logCallBtn">Log Called</button>
-        <button type="button" class="btn small secondary" id="logReplyBtn">Log Replied</button>
+      ${isNew ? '' : `
+      <div class="field-row"><label>Activity Log</label></div>
+      <div class="activity-list">
+        ${lead.activity.length ? lead.activity.map(a => `
+          <div class="activity-entry"><div class="ts">${new Date(a.created_at).toLocaleString()}</div><div>${escapeHtml(a.text)}</div></div>
+        `).join('') : '<p style="font-size:0.8rem;color:var(--muted);">No notes yet.</p>'}
       </div>
-
-      <div class="field-row">
-        <label>Business Name</label>
-        <input type="text" id="f_name" value="${escapeHtml(lead.name)}">
+      <div class="note-add">
+        <input type="text" id="noteInput" placeholder="Add a note…">
+        <button class="btn small" id="addNoteBtn">Add</button>
       </div>
-      <div class="two-col">
-        <div class="field-row">
-          <label>Decision Maker</label>
-          <input type="text" id="f_dm" value="${escapeHtml(lead.decisionMaker)}">
-        </div>
-        <div class="field-row">
-          <label>Phone</label>
-          <input type="text" id="f_phone" value="${escapeHtml(lead.phone)}">
-        </div>
+      `}
+      <div class="modal-actions">
+        <button class="btn brass block" id="saveLeadBtn">${isNew ? 'Create Lead' : 'Save Changes'}</button>
       </div>
-      <div class="two-col">
-        <div class="field-row">
-          <label>Email</label>
-          <input type="text" id="f_email" value="${escapeHtml(lead.email)}">
-        </div>
-        <div class="field-row">
-          <label>Status</label>
-          <select id="f_status">${statusOpts}</select>
-        </div>
-      </div>
-      <div class="field-row">
-        <label>Address</label>
-        <input type="text" id="f_address" value="${escapeHtml(lead.address)}">
-      </div>
-      <div class="two-col">
-        <div class="field-row">
-          <label>Source</label>
-          <select id="f_source">
-            <option value="Cold Outreach" ${lead.source==='Cold Outreach'?'selected':''}>Cold Outreach</option>
-            <option value="Referral" ${lead.source==='Referral'?'selected':''}>Referral</option>
-          </select>
-        </div>
-        <div class="field-row">
-          <label>Setup Completed Date</label>
-          <input type="date" id="f_setupdate" value="${lead.setupDate||''}">
-        </div>
-      </div>
-
-      <div class="section-label">Obstacles <span>outside your control</span></div>
-      <div class="checklist">${obstacleRows}</div>
-
-      <div class="section-label">Levers <span>actions you can take</span></div>
-      <div class="checklist">${leverRows}</div>
-
-      <div class="section-label">Test Tracking</div>
-      <div class="two-col">
-        <div class="field-row">
-          <label><input type="checkbox" id="f_review" ${lead.reviewReceived?'checked':''}> Review Received</label>
-          <input type="text" id="f_reviewlink" placeholder="Google review link" value="${escapeHtml(lead.reviewLink)}">
-        </div>
-        <div class="field-row">
-          <label><input type="checkbox" id="f_referral" ${lead.referralReceived?'checked':''}> Referral Received</label>
-        </div>
-      </div>
-      <div class="field-row">
-        <label>Upsell Interest (6-8wk touch)</label>
-        <select id="f_upsell">
-          <option value="pending" ${lead.upsellInterest==='pending'?'selected':''}>Pending</option>
-          <option value="yes" ${lead.upsellInterest==='yes'?'selected':''}>Yes</option>
-          <option value="no" ${lead.upsellInterest==='no'?'selected':''}>No</option>
-        </select>
-      </div>
-      <div class="field-row">
-        <label>Upsell Ideas Discussed</label>
-        <textarea id="f_upsellideas">${escapeHtml(lead.upsellIdeasDiscussed)}</textarea>
-      </div>
-      <div class="field-row">
-        <label>Trade Network / Connectedness Notes</label>
-        <textarea id="f_network">${escapeHtml(lead.tradeNetworkNotes)}</textarea>
-      </div>
-      <div class="field-row">
-        <label>General Notes</label>
-        <textarea id="f_notes">${escapeHtml(lead.notes)}</textarea>
-      </div>
-
-      <div style="display:flex;gap:8px;margin-top:16px;">
-        <button class="btn block brass" id="saveLead">Save Lead</button>
-      </div>
-      ${!isNew?`<button class="btn block rust" id="deleteLead" style="margin-top:8px;">Remove Lead</button>`:''}
+      ${isNew ? '' : '<button class="btn rust block" id="deleteLeadBtn" style="margin-top:8px;">Delete Lead</button>'}
+      <button class="btn secondary block" id="closeModalBtn" style="margin-top:8px;">Close</button>
     </div>
   </div>`;
 
-  document.getElementById('overlay').onclick = (e)=>{ if(e.target.id==='overlay') closeModal(); };
-  document.getElementById('closeModal').onclick = closeModal;
+  document.getElementById('modalBackdrop').onclick = (e) => { if (e.target.id === 'modalBackdrop') closeModal(); };
+  document.getElementById('closeModalBtn').onclick = closeModal;
 
-  document.querySelectorAll('.lever-state-btns').forEach(group=>{
-    const key = group.dataset.leverkey;
-    group.querySelectorAll('button').forEach(btn=>{
-      btn.onclick = ()=>{
-        if(!lead.levers) lead.levers = {};
-        lead.levers[key] = btn.dataset.state;
-        group.querySelectorAll('button').forEach(b=>{ b.classList.remove('on','done-on'); });
-        btn.classList.add(btn.dataset.state==='done' ? 'done-on' : (btn.dataset.state==='na' ? '' : 'on'));
-        if(btn.dataset.state !== 'na') btn.classList.add(btn.dataset.state==='done'?'done-on':'on');
-      };
-    });
-  });
-
-  function readSocialsFromForm(){
-    if(!lead.socials) lead.socials = {facebook:'',instagram:'',x:''};
-    lead.socials.facebook = document.getElementById('soc_fb').value.trim();
-    lead.socials.instagram = document.getElementById('soc_ig').value.trim();
-    lead.socials.x = document.getElementById('soc_x').value.trim();
-  }
-
-  ['logDmBtn','logEmailBtn','logCallBtn','logReplyBtn'].forEach(id=>{
-    const btn = document.getElementById(id);
-    if(!btn) return;
-    btn.onclick = async ()=>{
-      readSocialsFromForm();
-      const type = id==='logDmBtn'?'dm':id==='logEmailBtn'?'email':id==='logCallBtn'?'call':'reply';
-      logOutreach(lead, type);
-      if(isNew) state.leads.push(lead);
-      await saveLeads();
-      openLeadModal(lead.id); // re-render modal in place with updated log
+  document.getElementById('saveLeadBtn').onclick = async () => {
+    const payload = {
+      business_name: document.getElementById('f_name').value.trim(),
+      phone: document.getElementById('f_phone').value.trim(),
+      address: document.getElementById('f_address').value.trim(),
+      website: document.getElementById('f_website').value.trim(),
+      email: document.getElementById('f_email').value.trim(),
+      decision_maker: document.getElementById('f_dm').value.trim(),
+      outreach_status: document.getElementById('f_status').value,
     };
-  });
-
-  document.getElementById('saveLead').onclick = async ()=>{
-    readSocialsFromForm();
-    lead.name = document.getElementById('f_name').value.trim() || 'Unnamed Lead';
-    lead.decisionMaker = document.getElementById('f_dm').value.trim();
-    lead.phone = document.getElementById('f_phone').value.trim();
-    lead.email = document.getElementById('f_email').value.trim();
-    lead.status = document.getElementById('f_status').value;
-    lead.address = document.getElementById('f_address').value.trim();
-    lead.source = document.getElementById('f_source').value;
-    lead.setupDate = document.getElementById('f_setupdate').value || null;
-    lead.reviewReceived = document.getElementById('f_review').checked;
-    lead.reviewLink = document.getElementById('f_reviewlink').value.trim();
-    lead.referralReceived = document.getElementById('f_referral').checked;
-    lead.upsellInterest = document.getElementById('f_upsell').value;
-    lead.upsellIdeasDiscussed = document.getElementById('f_upsellideas').value.trim();
-    lead.tradeNetworkNotes = document.getElementById('f_network').value.trim();
-    lead.notes = document.getElementById('f_notes').value.trim();
-
-    state.obstacles.forEach(o=>{
-      const cb = document.getElementById('obs_'+o.id);
-      if(!lead.obstacles) lead.obstacles = {};
-      lead.obstacles[o.id] = cb.checked;
-    });
-
-    if(isNew) state.leads.push(lead);
-    await saveLeads();
-    closeModal();
-    render();
-  };
-
-  const delBtn = document.getElementById('deleteLead');
-  if(delBtn) delBtn.onclick = async ()=>{
-    if(confirm('Remove this lead permanently?')){
-      state.leads = state.leads.filter(l=>l.id!==lead.id);
-      await saveLeads();
+    if (!payload.business_name) { alert('Business name is required'); return; }
+    try {
+      if (isNew) await api('/leads', { method: 'POST', body: JSON.stringify(payload) });
+      else await api('/leads/' + lead.id, { method: 'PATCH', body: JSON.stringify(payload) });
       closeModal();
+      await loadLeads();
       render();
-    }
+    } catch (e) { alert(e.message); }
   };
+
+  if (!isNew) {
+    document.getElementById('addNoteBtn').onclick = async () => {
+      const input = document.getElementById('noteInput');
+      const text = input.value.trim();
+      if (!text) return;
+      await api('/leads/' + lead.id + '/notes', { method: 'POST', body: JSON.stringify({ text }) });
+      openLeadModal(lead.id);
+    };
+    document.getElementById('deleteLeadBtn').onclick = async () => {
+      if (!confirm('Delete this lead? This cannot be undone.')) return;
+      await api('/leads/' + lead.id, { method: 'DELETE' });
+      closeModal();
+      await loadLeads();
+      render();
+    };
+  }
 }
-function closeModal(){ document.getElementById('modalRoot').innerHTML=''; }
 
-// ---------- Tab nav ----------
-document.querySelectorAll('nav.tabs button').forEach(btn=>{
-  btn.onclick = ()=>{ state.activeTab = btn.dataset.tab; render(); };
+function closeModal(){ document.getElementById('modalRoot').innerHTML = ''; }
+
+document.querySelectorAll('nav.tabs button').forEach(btn => {
+  btn.onclick = () => { state.activeTab = btn.dataset.tab; render(); };
 });
+document.getElementById('logoutBtn').onclick = async () => {
+  await fetch('/api/auth/logout', { method: 'POST' });
+  window.location.href = '/login.html';
+};
 
-// ---------- Init ----------
 (async function init(){
-  await loadAll();
-  render();
+  try {
+    await loadLeads();
+    render();
+  } catch (e) {
+    if (e.message !== 'unauthenticated') {
+      document.getElementById('mainArea').innerHTML = `<div class="empty">Failed to load: ${escapeHtml(e.message)}</div>`;
+    }
+  }
 })();
 
 })();
