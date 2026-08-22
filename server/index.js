@@ -3,6 +3,7 @@ const path = require('path');
 const express = require('express');
 const { sessionMiddleware, requireAuth, loginRateLimit, login, logout } = require('./auth');
 const leadsRouter = require('./leads');
+const { router: stagesRouter } = require('./stages');
 
 const app = express();
 app.set('trust proxy', 1); // needed on Render for secure cookies + req.ip to work correctly
@@ -20,6 +21,7 @@ app.get('/api/auth/me', requireAuth, (req, res) => res.json({ userId: req.sessio
 // get added here in later build steps).
 app.use('/api', requireAuth);
 app.use('/api/leads', leadsRouter);
+app.use('/api/leads', stagesRouter);
 
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
