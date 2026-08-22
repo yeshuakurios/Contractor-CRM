@@ -161,12 +161,31 @@ function renderLeads(){
 
 function renderImport(){
   return `
-  <div class="field-row"><label>Paste Leads to Import</label></div>
+  <div class="field-row"><label>Search Google Places</label></div>
+  <div class="field-row"><input type="text" id="placesLocation" placeholder="City, State (e.g. Dayton, OH)"></div>
+  <div class="field-row"><input type="text" id="placesType" placeholder="Business type" value="plumber"></div>
+  <button class="btn block brass" id="placesSearchBtn">Search &amp; Import</button>
+  <div id="placesResult"></div>
+
+  <div class="field-row" style="margin-top:24px;"><label>Paste Leads to Import</label></div>
   <p style="font-size:0.82rem;color:var(--muted);margin-top:-8px;">One lead per line: <span class="mono">Name, Phone, Address</span> — phone/address optional.</p>
   <div class="import-area"><textarea id="importText" placeholder="Halpin Plumbing Inc, 513-790-6985, 5177 Fishwick Dr, Cincinnati OH"></textarea></div>
   <button class="btn block" id="previewImportBtn" style="margin-top:10px;">Import</button>
   <div id="importResult"></div>
   `;
+}
+
+function renderImportSummary(result){
+  let html = `<p style="color:var(--ok);font-size:0.85rem;">✓ Imported ${result.created.length} new lead${result.created.length===1?'':'s'}.</p>`;
+  if (result.duplicates.length) {
+    html += `<div class="dup-list">`;
+    result.duplicates.forEach(d => {
+      const name = (d.incoming.name || d.incoming.business_name || '');
+      html += `<div class="dup-row"><span>${escapeHtml(name)}</span><span style="color:var(--muted);">matches "${escapeHtml(d.existing.business_name)}"</span></div>`;
+    });
+    html += `</div>`;
+  }
+  return html;
 }
 
 function attachHandlers(){
@@ -187,19 +206,30 @@ function attachHandlers(){
     importBtn.disabled = true;
     try {
       const result = await api('/leads/import', { method: 'POST', body: JSON.stringify({ text }) });
-      let html = `<p style="color:var(--ok);font-size:0.85rem;">✓ Imported ${result.created.length} new lead${result.created.length===1?'':'s'}.</p>`;
-      if (result.duplicates.length) {
-        html += `<div class="dup-list">`;
-        result.duplicates.forEach(d => html += `<div class="dup-row"><span>${escapeHtml(d.incoming.name)}</span><span style="color:var(--muted);">matches "${escapeHtml(d.existing.business_name)}"</span></div>`);
-        html += `</div>`;
-      }
-      document.getElementById('importResult').innerHTML = html;
+      document.getElementById('importResult').innerHTML = renderImportSummary(result);
       document.getElementById('importText').value = '';
       await loadLeads();
     } catch (e) {
       document.getElementById('importResult').innerHTML = `<p style="color:var(--rust);">${escapeHtml(e.message)}</p>`;
     }
     importBtn.disabled = false;
+  };
+
+  const placesBtn = document.getElementById('placesSearchBtn');
+  if (placesBtn) placesBtn.onclick = async () => {
+    const location = document.getElementById('placesLocation').value.trim();
+    const businessType = document.getElementById('placesType').value.trim() || 'plumber';
+    if (!location) { alert('Enter a location'); return; }
+    placesBtn.disabled = true;
+    document.getElementById('placesResult').innerHTML = `<p style="font-size:0.82rem;color:var(--muted);">Searching…</p>`;
+    try {
+      const result = await api('/leads/import/places', { method: 'POST', body: JSON.stringify({ location, businessType }) });
+      document.getElementById('placesResult').innerHTML = renderImportSummary(result);
+      await loadLeads();
+    } catch (e) {
+      document.getElementById('placesResult').innerHTML = `<p style="color:var(--rust);">${escapeHtml(e.message)}</p>`;
+    }
+    placesBtn.disabled = false;
   };
 }
 
