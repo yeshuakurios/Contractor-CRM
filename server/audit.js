@@ -2,23 +2,44 @@ const { fetchHtml, stripTags } = require('./fetchSite');
 const { callClaude } = require('./claude');
 const { fetchStockPhotos } = require('./stockPhotos');
 const { extractLogoUrl, extractAccentColor } = require('./branding');
+const { detectEmbeddedFeatures, detectTextSignals } = require('./featureDetect');
 const { SECTION_GUIDE, pickTemplate } = require('./mockupTemplates');
 
-const SITE_TEXT_CAP = 6000; // keep the prompt (and cost) small
+// Raised from 6000: real sites often front-load boilerplate (repeated nav —
+// stripped separately in fetchSite.js — plus things like a full blog-post
+// grid) ahead of the actual marketing copy in document order, so a small cap
+// was truncating away real content (licensing, warranty, pricing, etc.)
+// before the audit ever saw it, making it look missing when it wasn't.
+const SITE_TEXT_CAP = 14000;
 
 function escapeHtml(s) {
   return (s || '').toString().replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
-async function analyzeWeaknesses(businessName, siteText) {
+async function analyzeWeaknesses(businessName, siteText, detectedFeatures) {
+  const detectedNote = (detectedFeatures && detectedFeatures.length)
+    ? `\n\nThe page also embeds the following third-party widgets (detected via <script>/<iframe> tags in the raw ` +
+      `HTML): ${detectedFeatures.join(', ')}. These render via JavaScript, so their content does not appear in the ` +
+      `text content above — but they ARE present and working on the site. Do not list any of them, or the ` +
+      `functionality they provide, as a weakness or missing feature.`
+    : '';
+  const textSignals = detectTextSignals(siteText);
+  const textSignalNote = textSignals.length
+    ? `\n\nAn automated keyword scan of the text content above already found: ${textSignals.join(', ')}. Before ` +
+      `writing a weakness that claims one of these is missing, re-read the text content for it — if the scan found ` +
+      `it, it's there, so do not claim it's absent.`
+    : '';
   const raw = await callClaude(
-    `Business: ${businessName}\n\nWebsite text content:\n${siteText}`,
+    `Business: ${businessName}\n\nWebsite text content:\n${siteText}${detectedNote}${textSignalNote}`,
     {
       system:
         'You are a website auditor for a plumbing-automation agency that pitches redesigns to independent plumbers. ' +
         'Given a business name and their current website\'s text content, identify concrete weaknesses ' +
         '(e.g. missing online booking, no reviews/testimonials shown, no clear phone/CTA, dated or generic copy, ' +
-        'no service area or emergency-service messaging). Also check whether the text names an owner, founder, or ' +
+        'no service area or emergency-service messaging). Only report something as missing if you cannot find it, ' +
+        'or a close synonym of it, anywhere in the given text — quote or closely paraphrase the site\'s own words ' +
+        'when confirming a strength is present, and never claim an absence you have not actually checked the full ' +
+        'text for. Also check whether the text names an owner, founder, or ' +
         'manager (e.g. an "About Us" or "Meet the Owner" blurb) — only extract a name if the site actually states one; ' +
         'never guess or infer one from the business name. If you name a specific person anywhere in your weaknesses ' +
         'or recommendations text, you MUST also put that same name in decision_maker — never mention someone by name ' +
@@ -162,8 +183,9 @@ async function runAudit(businessName, websiteUrl, address, opts = {}) {
     throw err;
   }
   const siteText = stripTags(html).slice(0, SITE_TEXT_CAP);
+  const detectedFeatures = detectEmbeddedFeatures(html);
 
-  const { weaknesses, recommendations, decisionMaker } = await analyzeWeaknesses(businessName, siteText);
+  const { weaknesses, recommendations, decisionMaker } = await analyzeWeaknesses(businessName, siteText, detectedFeatures);
 
   const template = pickTemplate(leadId, avoidTemplateIds);
   const logoUrl = extractLogoUrl(html, websiteUrl);
