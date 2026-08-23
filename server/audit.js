@@ -1,22 +1,25 @@
-const { fetchHtml, stripTags } = require('./fetchSite');
+const { fetchHtml, stripTags, extractNavLinks } = require('./fetchSite');
 const { callClaude } = require('./claude');
 const { fetchStockPhotos } = require('./stockPhotos');
 const { extractLogoUrl, extractAccentColor } = require('./branding');
 const { detectEmbeddedFeatures, detectTextSignals } = require('./featureDetect');
 const { SECTION_GUIDE, pickTemplate } = require('./mockupTemplates');
 
-// Raised from 6000: real sites often front-load boilerplate (repeated nav —
-// stripped separately in fetchSite.js — plus things like a full blog-post
-// grid) ahead of the actual marketing copy in document order, so a small cap
-// was truncating away real content (licensing, warranty, pricing, etc.)
-// before the audit ever saw it, making it look missing when it wasn't.
-const SITE_TEXT_CAP = 14000;
+// Raised from 6000, then 14000: real sites often front-load boilerplate
+// (repeated nav — stripped separately in fetchSite.js — plus things like a
+// full blog-post grid) ahead of the actual marketing copy in document order,
+// so a small cap was truncating away real content (licensing, warranty,
+// pricing, etc.) before the audit ever saw it, making it look missing when
+// it wasn't. No fixed cap can guarantee every page's real content fits, so
+// this is paired with a truncation note below telling the model an apparent
+// cutoff is our own capture artifact, not a site defect.
+const SITE_TEXT_CAP = 20000;
 
 function escapeHtml(s) {
   return (s || '').toString().replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
-async function analyzeWeaknesses(businessName, siteText, detectedFeatures) {
+async function analyzeWeaknesses(businessName, siteText, { detectedFeatures, placeRating, navLinks, wasTruncated } = {}) {
   const detectedNote = (detectedFeatures && detectedFeatures.length)
     ? `\n\nThe page also embeds the following third-party widgets (detected via <script>/<iframe> tags in the raw ` +
       `HTML): ${detectedFeatures.join(', ')}. These render via JavaScript, so their content does not appear in the ` +
@@ -29,8 +32,33 @@ async function analyzeWeaknesses(businessName, siteText, detectedFeatures) {
       `writing a weakness that claims one of these is missing, re-read the text content for it — if the scan found ` +
       `it, it's there, so do not claim it's absent.`
     : '';
+  // Reviews often only render client-side (a JS widget fetching from a
+  // review platform), so they can be genuinely absent from the fetched text
+  // even though the business has real reviews. Google's own listing is a
+  // ground-truth signal for that case that doesn't depend on rendering JS.
+  const placeRatingNote = placeRating
+    ? `\n\nGoogle's own business listing for ${businessName} shows a rating of ${placeRating.rating} stars from ` +
+      `${placeRating.userRatingCount} review${placeRating.userRatingCount === 1 ? '' : 's'} — this is a real, ` +
+      `verified signal (from Google Places, not the website itself) that the business has reviews and an ` +
+      `established reputation. Do not claim the business "has no reviews" or "no ratings" — that would be false. ` +
+      `You MAY still note, if true, that the site itself does not prominently display these reviews/ratings — ` +
+      `that is a legitimate, separate observation (a missed opportunity to showcase trust signals on their own site).`
+    : '';
+  const navLinksNote = (navLinks && navLinks.length)
+    ? `\n\nThe site's navigation menu (excluded from the text content above to avoid repeated menu boilerplate) ` +
+      `contains these link labels: ${navLinks.join(', ')}. If any of these looks like a person's name (e.g. links ` +
+      `to an "About" or bio page), treat that as the site naming an owner/founder/manager for the purposes of ` +
+      `decision_maker — do not say the site names no owner if a name-like link is present here.`
+    : '';
+  const truncationNote = wasTruncated
+    ? `\n\nNote: the text content above was cut off partway through because the full page's text exceeded this ` +
+      `prompt's length budget — it may end mid-sentence or mid-section with no closing punctuation. This is an ` +
+      `artifact of how this text was captured, not a defect of the business's actual website. Do NOT report the ` +
+      `cutoff itself, or anything that looks incomplete only because of where the text happens to end, as a weakness.`
+    : '';
   const raw = await callClaude(
-    `Business: ${businessName}\n\nWebsite text content:\n${siteText}${detectedNote}${textSignalNote}`,
+    `Business: ${businessName}\n\nWebsite text content:\n${siteText}` +
+      `${detectedNote}${textSignalNote}${placeRatingNote}${navLinksNote}${truncationNote}`,
     {
       system:
         'You are a website auditor for a plumbing-automation agency that pitches redesigns to independent plumbers. ' +
@@ -174,7 +202,7 @@ ${fragment}
 }
 
 async function runAudit(businessName, websiteUrl, address, opts = {}) {
-  const { leadId, avoidTemplateIds, avoidPhotoUrls } = opts;
+  const { leadId, avoidTemplateIds, avoidPhotoUrls, placeRating } = opts;
 
   const html = await fetchHtml(websiteUrl);
   if (!html) {
@@ -182,10 +210,15 @@ async function runAudit(businessName, websiteUrl, address, opts = {}) {
     err.status = 422;
     throw err;
   }
-  const siteText = stripTags(html).slice(0, SITE_TEXT_CAP);
+  const fullText = stripTags(html);
+  const wasTruncated = fullText.length > SITE_TEXT_CAP;
+  const siteText = wasTruncated ? fullText.slice(0, SITE_TEXT_CAP) : fullText;
   const detectedFeatures = detectEmbeddedFeatures(html);
+  const navLinks = extractNavLinks(html);
 
-  const { weaknesses, recommendations, decisionMaker } = await analyzeWeaknesses(businessName, siteText, detectedFeatures);
+  const { weaknesses, recommendations, decisionMaker } = await analyzeWeaknesses(
+    businessName, siteText, { detectedFeatures, placeRating, navLinks, wasTruncated }
+  );
 
   const template = pickTemplate(leadId, avoidTemplateIds);
   const logoUrl = extractLogoUrl(html, websiteUrl);

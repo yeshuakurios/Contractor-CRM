@@ -112,4 +112,28 @@ async function searchPlaces(location, businessType, radiusMiles = DEFAULT_RADIUS
   return results;
 }
 
-module.exports = { searchPlaces };
+// Best-effort enrichment for the audit pipeline, not a primary user action —
+// return null on any failure (missing key, missing/stale place_id, API
+// error) rather than throwing, same as fetchStockPhotos's fallback style.
+// Place Details (unlike Text Search) returns rating/userRatingCount as flat
+// top-level fields, not nested under a `places` array.
+async function getPlaceRating(placeId) {
+  const apiKey = process.env.GOOGLE_PLACES_API_KEY;
+  if (!apiKey || !placeId) return null;
+  try {
+    const res = await fetch(`https://places.googleapis.com/v1/places/${placeId}`, {
+      headers: {
+        'X-Goog-Api-Key': apiKey,
+        'X-Goog-FieldMask': 'rating,userRatingCount',
+      },
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (typeof data.rating !== 'number') return null;
+    return { rating: data.rating, userRatingCount: data.userRatingCount || 0 };
+  } catch {
+    return null;
+  }
+}
+
+module.exports = { searchPlaces, getPlaceRating };
