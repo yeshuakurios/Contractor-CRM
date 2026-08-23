@@ -1,8 +1,14 @@
 const { fetchHtml, stripTags } = require('./fetchSite');
 const { callClaude } = require('./claude');
 const { fetchStockPhotos } = require('./stockPhotos');
+const { extractLogoUrl, extractAccentColor } = require('./branding');
+const { SECTION_GUIDE, pickTemplate } = require('./mockupTemplates');
 
 const SITE_TEXT_CAP = 6000; // keep the prompt (and cost) small
+
+function escapeHtml(s) {
+  return (s || '').toString().replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
 
 async function analyzeWeaknesses(businessName, siteText) {
   const raw = await callClaude(
@@ -34,19 +40,27 @@ async function analyzeWeaknesses(businessName, siteText) {
   }
 }
 
-async function generateMockup(businessName, weaknesses, photos, address) {
-  // Ask Claude for placeholder tokens rather than real URLs — long CDN URLs
-  // are exactly the kind of string an LLM can subtly mistype, and a wrong
-  // src just shows a broken image. Swapping in the real URL afterward is
-  // deterministic and can't fail that way.
+// Fetches a larger pool than we need and prefers photos not already used by
+// another lead in the same market (see leads.js), so nearby leads don't end
+// up with a literally identical hero photo — the single most noticeable
+// "these sites look copy-pasted" tell.
+async function pickPhotos(avoidPhotoUrls) {
+  const pool = await fetchStockPhotos('professional plumber at work', 6);
+  const avoid = new Set(avoidPhotoUrls || []);
+  const fresh = pool.filter((p) => !avoid.has(p.url));
+  return (fresh.length ? fresh : pool).slice(0, 2);
+}
+
+async function generateMockup({ businessName, weaknesses, address, template, photos, logoUrl, accentColor }) {
+  // Ask Claude for placeholder tokens rather than real photo URLs — long CDN
+  // URLs are exactly the kind of string an LLM can subtly mistype, and a
+  // wrong src just shows a broken image. Swapping in the real URL afterward
+  // is deterministic and can't fail that way.
   const photoTokens = (photos || []).map((p, i) => ({ token: `PHOTO_${i + 1}`, ...p }));
   const photoInstructions = photoTokens.length
-    ? `Real photos are available for this mockup. Use them as <img> src values using these EXACT placeholder ` +
-      `tokens as the whole src attribute (they get swapped for real photo URLs afterward — do not alter them or ` +
-      `invent any other image source): ${photoTokens.map((p) => `${p.token} (${p.alt})`).join(', ')}. Place them ` +
-      `naturally — e.g. a hero/banner image and a service-in-progress photo. A section without a good fit for one ` +
-      `of these can stay CSS-only.\n\n`
-    : '';
+    ? `Real photos are available. Use these EXACT placeholder tokens as <img> src values (they get swapped for ` +
+      `real photo URLs afterward — do not alter them): ${photoTokens.map((p) => `${p.token} (${p.alt})`).join(', ')}.\n\n`
+    : `No stock photos are available — omit the <img> tags the section guide mentions and let those spots stay CSS-only.\n\n`;
 
   // A business name alone is exactly the kind of proper noun an LLM can
   // conflate with a real, similarly-named company it knows from training —
@@ -59,6 +73,16 @@ async function generateMockup(businessName, weaknesses, photos, address) {
     : `No address was provided for this business — keep any location references generic (e.g. "your area", "the ` +
       `local community") rather than inventing a specific city or state.\n`;
 
+  const logoInstruction = logoUrl
+    ? `A real logo image was found on this business's own site — use it: <a class="brand"><img src="${logoUrl}" ` +
+      `alt="${businessName} logo" style="height:36px;width:auto;"> ${businessName}</a>\n`
+    : `No logo image was found — the .brand element should be the business name as styled text only, no <img>.\n`;
+
+  const accentInstruction = accentColor
+    ? `This business's own site uses ${accentColor} as its brand color — after the section markup, add exactly one ` +
+      `line <style>:root{${template.accentVar}: ${accentColor};}</style> so the mockup picks up their real branding.\n`
+    : '';
+
   const html = await callClaude(
     `Business: ${businessName}\nWeaknesses to address: ${weaknesses.join('; ') || 'general modernization'}\n\n` +
       locationInstruction +
@@ -66,33 +90,55 @@ async function generateMockup(businessName, weaknesses, photos, address) {
       'Treat the business name as a label only — invent no specific facts (founding year, awards, service area ' +
       'beyond the address above, etc.) not given in this prompt. Any testimonials/reviews you write must be ' +
       'generic and clearly illustrative, never attributed to a real person or a real business.\n\n' +
+      logoInstruction + accentInstruction + '\n' +
       photoInstructions +
-      'Produce a single self-contained HTML file (inline CSS, no external assets other than the photo tokens ' +
-      'above) showing an improved homepage mockup for this plumbing business that fixes the weaknesses above — ' +
-      'include a clear booking/call-to-action, a testimonials/reviews section, and a clean modern layout. Keep ' +
-      'the CSS reasonably concise — a complete, fully-closed document matters more than exhaustive styling. ' +
-      'Respond with ONLY the raw HTML, starting with <!DOCTYPE html>, no explanation before or after.',
+      SECTION_GUIDE +
+      '\n\nRespond with ONLY the HTML that goes between <body> and </body> — no <!DOCTYPE>, <html>, <head>, or ' +
+      '<body> tags themselves, no markdown code fences, no explanation before or after.',
     {
-      system: 'You produce compact, realistic website mockups as single HTML files for sales outreach purposes.',
+      system: 'You produce compact, realistic website mockup content for sales outreach, filling a fixed, ' +
+        'already-styled section template with a specific business\'s content.',
       maxTokens: 8192,
     }
   );
-  let trimmed = html.trim().replace(/^```html\n?|```$/g, '');
-  if (!trimmed.includes('</html>')) {
-    // Response was cut off before the document closed — a previous 3000-token
-    // cap did this in practice (title tag survives, but no body content ever
-    // gets written). Fail loudly rather than store a page that renders blank.
+
+  let fragment = html.trim().replace(/^```html\n?|```$/g, '').replace(/```$/g, '').trim();
+  fragment = fragment.replace(/^<body[^>]*>/i, '').replace(/<\/body>\s*$/i, '').trim();
+
+  // Truncation check, adapted for a body fragment rather than a full
+  // document: every opened <section> must close, and the fragment must
+  // reach the footer — a previous 3000-token cap cut generation off
+  // mid-document in practice, so failing loudly beats storing a partial page.
+  const openSections = (fragment.match(/<section\b/gi) || []).length;
+  const closeSections = (fragment.match(/<\/section>/gi) || []).length;
+  if (!fragment || openSections !== closeSections || !fragment.includes('</footer>')) {
     const err = new Error('Mockup generation was truncated before completing — try running the audit again');
     err.status = 502;
     throw err;
   }
+
   for (const p of photoTokens) {
-    trimmed = trimmed.split(p.token).join(p.url);
+    fragment = fragment.split(p.token).join(p.url);
   }
-  return trimmed;
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>${escapeHtml(businessName)}</title>
+${template.fontImport}
+<style>${template.css}</style>
+</head>
+<body>
+${fragment}
+</body>
+</html>`;
 }
 
-async function runAudit(businessName, websiteUrl, address) {
+async function runAudit(businessName, websiteUrl, address, opts = {}) {
+  const { leadId, avoidTemplateIds, avoidPhotoUrls } = opts;
+
   const html = await fetchHtml(websiteUrl);
   if (!html) {
     const err = new Error('Could not fetch the website — check the URL is reachable');
@@ -102,10 +148,22 @@ async function runAudit(businessName, websiteUrl, address) {
   const siteText = stripTags(html).slice(0, SITE_TEXT_CAP);
 
   const { weaknesses, recommendations, decisionMaker } = await analyzeWeaknesses(businessName, siteText);
-  const photos = await fetchStockPhotos('professional plumber at work');
-  const mockupHtml = await generateMockup(businessName, weaknesses, photos, address);
 
-  return { weaknesses, recommendations_text: recommendations, mockup_html: mockupHtml, decision_maker: decisionMaker };
+  const template = pickTemplate(leadId, avoidTemplateIds);
+  const logoUrl = extractLogoUrl(html, websiteUrl);
+  const accentColor = extractAccentColor(html);
+  const photos = await pickPhotos(avoidPhotoUrls);
+
+  const mockupHtml = await generateMockup({ businessName, weaknesses, address, template, photos, logoUrl, accentColor });
+
+  return {
+    weaknesses,
+    recommendations_text: recommendations,
+    mockup_html: mockupHtml,
+    decision_maker: decisionMaker,
+    style_template: template.id,
+    style_photo_urls: photos.map((p) => p.url),
+  };
 }
 
 module.exports = { runAudit };

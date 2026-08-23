@@ -1,0 +1,111 @@
+/* "Sarab" look — warm, bold, editorial. Re-implemented as lean standalone CSS
+   (no Bootstrap/FontAwesome dependency) from the real design tokens of the
+   MIT-licensed themewagon/sarab template (colors, type pairing, shadow
+   scale), scoped to the section vocabulary our mockups actually use. */
+:root {
+  --primary: #e8281a;
+  --secondary: #f6a623;
+  --dark: #1a1a1a;
+  --cream: #fff8f0;
+  --light: #f9f5f0;
+  --shadow: 0 8px 40px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 20px 60px rgba(0, 0, 0, 0.18);
+  --radius: 16px;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { font-family: 'Poppins', Arial, sans-serif; color: #444; background: #fff; overflow-x: hidden; }
+h1, h2, h3, h4 { font-family: 'Playfair Display', Georgia, serif; color: var(--dark); line-height: 1.15; }
+a { text-decoration: none; color: inherit; }
+img { max-width: 100%; display: block; }
+.container { max-width: 1160px; margin: 0 auto; padding: 0 24px; }
+.btn { display: inline-flex; align-items: center; gap: 8px; padding: 14px 28px; border-radius: 999px; font-weight: 600; font-family: 'Poppins', sans-serif; cursor: pointer; border: none; }
+.btn-primary { background: var(--primary); color: #fff; box-shadow: var(--shadow); }
+.btn-secondary { background: #fff; color: var(--dark); border: 1px solid #e5ddd3; }
+
+.topbar { background: var(--dark); color: #eee; font-size: 0.85rem; padding: 8px 0; }
+.topbar .container { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+.topbar-info { display: flex; gap: 24px; flex-wrap: wrap; }
+
+.navbar { padding: 18px 0; border-bottom: 1px solid #f1e9df; }
+.navbar .container { display: flex; align-items: center; justify-content: space-between; }
+.brand { display: flex; align-items: center; gap: 10px; font-family: 'Playfair Display', serif; font-size: 1.4rem; font-weight: 700; }
+.brand img { height: 40px; width: auto; border-radius: 8px; }
+.nav-links { display: flex; gap: 28px; font-weight: 500; font-size: 0.95rem; }
+
+.hero { background: var(--cream); padding: 64px 0; position: relative; overflow: hidden; }
+.hero .container { display: grid; grid-template-columns: 1.1fr 1fr; gap: 48px; align-items: center; }
+.trust-strip { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
+.trust-pill { display: flex; align-items: center; gap: 6px; background: #fff; padding: 8px 14px; border-radius: 999px; box-shadow: var(--shadow); font-size: 0.8rem; font-weight: 600; color: var(--dark); }
+.hero h1 { font-size: 2.8rem; margin-bottom: 18px; }
+.hero h1 em { color: var(--primary); font-style: normal; }
+.hero p { font-size: 1.05rem; color: #6b6258; margin-bottom: 28px; max-width: 480px; }
+.hero-cta { display: flex; gap: 14px; flex-wrap: wrap; }
+.hero-media { position: relative; }
+.hero-media img { border-radius: var(--radius); box-shadow: var(--shadow-lg); width: 100%; aspect-ratio: 4/3; object-fit: cover; }
+.floating-card { position: absolute; background: #fff; border-radius: 14px; box-shadow: var(--shadow-lg); padding: 14px 18px; font-size: 0.85rem; }
+.floating-card.top-right { top: -18px; right: -18px; }
+.floating-card.bottom-left { bottom: -18px; left: -18px; }
+.floating-card strong { display: block; font-size: 1.05rem; color: var(--dark); }
+
+.section { padding: 72px 0; }
+.section-head { text-align: center; max-width: 620px; margin: 0 auto 44px; }
+.section-eyebrow { color: var(--primary); font-weight: 700; text-transform: uppercase; font-size: 0.78rem; letter-spacing: 0.08em; margin-bottom: 8px; display: block; }
+.section-head h2 { font-size: 2.1rem; }
+
+.services-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+.service-card { background: #fff; border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); }
+.service-card img { width: 100%; height: 170px; object-fit: cover; }
+.service-card .body { padding: 20px; }
+.service-card .badge { display: inline-block; background: var(--secondary); color: #fff; font-size: 0.72rem; font-weight: 700; padding: 4px 10px; border-radius: 999px; margin-bottom: 10px; }
+.service-card h3 { font-size: 1.15rem; margin-bottom: 6px; }
+.service-card p { font-size: 0.88rem; color: #7a7168; margin-bottom: 14px; }
+.service-card .price { color: var(--primary); font-weight: 700; font-size: 1.1rem; }
+
+.about { background: var(--light); }
+.about .container { display: grid; grid-template-columns: 1fr 1.1fr; gap: 48px; align-items: center; }
+.about img { border-radius: var(--radius); box-shadow: var(--shadow); aspect-ratio: 1/1; object-fit: cover; }
+.about ul { list-style: none; margin-top: 20px; display: flex; flex-direction: column; gap: 12px; }
+.about li { padding-left: 28px; position: relative; font-size: 0.95rem; color: #55504a; }
+.about li::before { content: '✓'; position: absolute; left: 0; color: var(--primary); font-weight: 700; }
+
+.testimonials-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+.testimonial-card { background: var(--light); border-radius: var(--radius); padding: 28px; }
+.testimonial-card .stars { color: var(--secondary); margin-bottom: 12px; letter-spacing: 2px; }
+.testimonial-card p { font-size: 0.92rem; color: #55504a; margin-bottom: 18px; }
+.testimonial-person { display: flex; align-items: center; gap: 12px; }
+.testimonial-person img { width: 42px; height: 42px; border-radius: 50%; object-fit: cover; }
+.testimonial-person strong { display: block; font-size: 0.92rem; }
+.testimonial-person span { font-size: 0.8rem; color: #948b81; }
+
+.cta-banner { background: var(--primary); color: #fff; text-align: center; padding: 56px 0; }
+.cta-banner h2 { color: #fff; font-size: 2rem; margin-bottom: 12px; }
+.cta-banner p { opacity: 0.9; margin-bottom: 24px; }
+.cta-banner .btn-primary { background: #fff; color: var(--primary); }
+
+.contact .container { display: grid; grid-template-columns: 0.9fr 1.1fr; gap: 40px; }
+.contact-info { background: var(--dark); color: #fff; border-radius: var(--radius); padding: 32px; }
+.contact-info h3 { color: #fff; margin-bottom: 8px; }
+.contact-info p.lead { color: #cfc6bb; font-size: 0.88rem; margin-bottom: 24px; }
+.contact-row { display: flex; gap: 12px; margin-bottom: 18px; align-items: flex-start; }
+.contact-row .icon { width: 34px; height: 34px; border-radius: 8px; background: var(--primary); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.contact-row .label { font-size: 0.72rem; text-transform: uppercase; color: #a89f94; letter-spacing: 0.05em; }
+.contact-form { background: #fff; border-radius: var(--radius); box-shadow: var(--shadow); padding: 32px; }
+.contact-form .row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+.contact-form label { display: block; font-size: 0.82rem; font-weight: 600; margin-bottom: 6px; }
+.contact-form input, .contact-form textarea { width: 100%; padding: 12px 14px; border: 1px solid #e5ddd3; border-radius: 8px; font-family: inherit; }
+
+footer { background: var(--dark); color: #cfc6bb; padding: 48px 0 24px; }
+footer .brand { color: #fff; }
+footer .footer-grid { display: grid; grid-template-columns: 1.3fr 1fr 1fr; gap: 32px; margin-bottom: 32px; }
+footer h4 { color: #fff; font-size: 0.95rem; margin-bottom: 14px; }
+footer ul { list-style: none; display: flex; flex-direction: column; gap: 8px; font-size: 0.88rem; }
+footer .bottom { border-top: 1px solid #33302c; padding-top: 20px; font-size: 0.8rem; text-align: center; color: #948b81; }
+
+@media (max-width: 860px) {
+  .hero .container, .about .container, .contact .container { grid-template-columns: 1fr; }
+  .services-grid, .testimonials-grid { grid-template-columns: 1fr; }
+  footer .footer-grid { grid-template-columns: 1fr; }
+  .contact-form .row { grid-template-columns: 1fr; }
+  .hero h1 { font-size: 2.1rem; }
+}
