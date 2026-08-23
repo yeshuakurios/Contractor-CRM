@@ -90,7 +90,8 @@
 <script>
 (function(){
 
-const OUTREACH_STATUSES = ['New','Mockup Generated','Sent to Prospect','Followed Up','Responded','Declined'];
+const OUTREACH_STATUSES = ['New','Mockup Generated','Sent to Prospect','Followed Up','Responded','Declined','No Digital Presence'];
+const SOCIAL_PLATFORMS = { facebook: 'Facebook', instagram: 'Instagram', x: 'X / Twitter' };
 
 let state = { leads: [], activeTab: 'leads', filterStatus: 'all', searchQuery: '', selectedIds: new Set() };
 
@@ -292,6 +293,7 @@ async function openLeadModal(id){
       <div class="field-row"><label>Website</label><input id="f_website" value="${escapeHtml(lead.website)}"></div>
       <div class="field-row"><label>Email</label><input id="f_email" value="${escapeHtml(lead.email)}"></div>
       <div class="field-row"><label>Decision Maker</label><input id="f_dm" value="${escapeHtml(lead.decision_maker)}"></div>
+      ${isNew ? '' : renderSocialsSection(lead)}
       <div class="field-row"><label>Outreach Status</label>
         <select id="f_status">${OUTREACH_STATUSES.map(s => `<option value="${s}" ${lead.outreach_status===s?'selected':''}>${s}</option>`).join('')}</select>
       </div>
@@ -333,13 +335,27 @@ async function openLeadModal(id){
     };
     if (!payload.business_name) { alert('Business name is required'); return; }
     try {
-      if (isNew) await api('/leads', { method: 'POST', body: JSON.stringify(payload) });
-      else await api('/leads/' + lead.id, { method: 'PATCH', body: JSON.stringify(payload) });
+      if (isNew) {
+        await api('/leads', { method: 'POST', body: JSON.stringify(payload) });
+      } else {
+        await api('/leads/' + lead.id, { method: 'PATCH', body: JSON.stringify(payload) });
+        const socialsPayload = {};
+        Object.keys(SOCIAL_PLATFORMS).forEach(p => {
+          socialsPayload[p] = document.getElementById('f_social_' + p).value.trim();
+        });
+        await api('/leads/' + lead.id + '/socials', { method: 'POST', body: JSON.stringify(socialsPayload) });
+      }
       closeModal();
       await loadLeads();
       render();
     } catch (e) { alert(e.message); }
   };
+
+  if (!isNew) {
+    document.querySelectorAll('[data-fill]').forEach(btn => {
+      btn.onclick = () => { document.getElementById(btn.dataset.fill).value = btn.dataset.url; };
+    });
+  }
 
   if (!isNew) {
     document.getElementById('addNoteBtn').onclick = async () => {
@@ -414,19 +430,29 @@ async function openLeadModal(id){
   }
 }
 
+// Social links are shown as editable fields (see renderSocialsSection),
+// auto-filled only when the audit confirmed a match — an unconfirmed find
+// shows as a "Use this" suggestion under the field instead of silently
+// populating it, since it might not actually be this business's account.
+function renderSocialsSection(lead){
+  const byPlatform = Object.fromEntries((lead.socials || []).map(s => [s.platform, s]));
+  return Object.entries(SOCIAL_PLATFORMS).map(([platform, label]) => {
+    const s = byPlatform[platform];
+    const trusted = s && (s.verification_status === 'confirmed' || s.verification_status === 'manual');
+    const value = trusted ? s.url : '';
+    const suggestion = (!trusted && s && s.url)
+      ? `<p style="font-size:0.72rem;color:var(--muted);margin:2px 0 8px;">Found (unverified): <a href="${escapeHtml(s.url)}" target="_blank" rel="noopener">${escapeHtml(s.url)}</a> <button type="button" class="btn small secondary" data-fill="f_social_${platform}" data-url="${escapeHtml(s.url)}">Use this</button></p>`
+      : '';
+    return `<div class="field-row"><label>${label}</label><input id="f_social_${platform}" value="${escapeHtml(value)}" placeholder="https://…"></div>${suggestion}`;
+  }).join('');
+}
+
 function renderAuditSection(lead){
   const audit = lead.latest_audit;
-  const socials = lead.socials || [];
   let html = `<div class="field-row"><label>Website Audit</label></div>`;
   const running = audit && audit.status === 'running';
   html += `<button class="btn block" id="runAuditBtn" ${(!lead.website || running) ? 'disabled' : ''}>${running ? 'Running…' : 'Run Audit'}</button>`;
   if (!lead.website) html += `<p style="font-size:0.78rem;color:var(--muted);margin-bottom:0;">Add a website above first.</p>`;
-
-  if (socials.length) {
-    html += `<div style="margin-top:10px;">` + socials.map(s =>
-      `<span class="badge" style="margin-right:6px;">${escapeHtml(s.platform)}: ${escapeHtml(s.verification_status)}${s.url ? ` <a href="${escapeHtml(s.url)}" target="_blank" rel="noopener">↗</a>` : ''}</span>`
-    ).join('') + `</div>`;
-  }
 
   if (audit) {
     if (running) {

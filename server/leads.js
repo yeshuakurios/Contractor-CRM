@@ -10,8 +10,9 @@ const { isLikelyChain } = require('./chains');
 
 const router = express.Router();
 
-const OUTREACH_STATUSES = ['New', 'Mockup Generated', 'Sent to Prospect', 'Followed Up', 'Responded', 'Declined'];
+const OUTREACH_STATUSES = ['New', 'Mockup Generated', 'Sent to Prospect', 'Followed Up', 'Responded', 'Declined', 'No Digital Presence'];
 const EDITABLE_FIELDS = ['business_name', 'phone', 'address', 'website', 'email', 'decision_maker', 'outreach_status'];
+const SOCIAL_PLATFORMS = ['facebook', 'instagram', 'x'];
 
 router.get('/', async (req, res, next) => {
   try {
@@ -104,6 +105,35 @@ router.post('/:id/notes', async (req, res, next) => {
       [req.params.id, req.body.author || null, text]
     );
     res.status(201).json(rows[0]);
+  } catch (err) { next(err); }
+});
+
+// Manual edits to the per-platform social links shown in the lead form.
+// Marks each as verification_status='manual' so a future audit re-run never
+// silently overwrites a value the operator typed in themselves — an empty
+// value removes the row instead (so re-running the audit can rediscover it).
+router.post('/:id/socials', async (req, res, next) => {
+  try {
+    const body = req.body || {};
+    const results = [];
+    for (const platform of SOCIAL_PLATFORMS) {
+      if (!(platform in body)) continue;
+      const url = (body[platform] || '').trim();
+      if (url) {
+        const { rows } = await pool.query(
+          `INSERT INTO lead_socials (lead_id, platform, url, verification_status, verified_via, verified_at)
+           VALUES ($1, $2, $3, 'manual', null, now())
+           ON CONFLICT (lead_id, platform) DO UPDATE SET
+             url = EXCLUDED.url, verification_status = 'manual', verified_via = null, verified_at = now()
+           RETURNING *`,
+          [req.params.id, platform, url]
+        );
+        results.push(rows[0]);
+      } else {
+        await pool.query('DELETE FROM lead_socials WHERE lead_id = $1 AND platform = $2', [req.params.id, platform]);
+      }
+    }
+    res.json(results);
   } catch (err) { next(err); }
 });
 
@@ -224,20 +254,43 @@ router.get('/:id/audit', async (req, res, next) => {
 });
 
 async function processAudit(lead, reportId) {
-  const socials = await discoverAndVerifySocials(lead.website, lead.phone, lead.address);
+  const { email: discoveredEmail, ...socials } = await discoverAndVerifySocials(lead.website, lead.phone, lead.address);
   for (const [platform, result] of Object.entries(socials)) {
     if (!result) continue;
+    // Never overwrite a link the operator entered/corrected by hand.
     await pool.query(
       `INSERT INTO lead_socials (lead_id, platform, url, verification_status, verified_via, verified_at)
        VALUES ($1, $2, $3, $4, $5, now())
        ON CONFLICT (lead_id, platform) DO UPDATE SET
          url = EXCLUDED.url, verification_status = EXCLUDED.verification_status,
-         verified_via = EXCLUDED.verified_via, verified_at = now()`,
+         verified_via = EXCLUDED.verified_via, verified_at = now()
+       WHERE lead_socials.verification_status IS DISTINCT FROM 'manual'`,
       [lead.id, platform, result.url, result.status, result.verified_via]
     );
   }
 
   const { weaknesses, recommendations_text, mockup_html, decision_maker } = await runAudit(lead.business_name, lead.website);
+
+  // Fill in anything the audit discovered before marking the report 'done' —
+  // the frontend refreshes the lead as soon as it sees that status, so these
+  // writes must land first or a fast poll can catch the lead mid-update.
+  // Only fill in fields the lead doesn't already have — never overwrite a
+  // real (possibly manually-entered) value.
+  if (decision_maker) {
+    await pool.query(
+      `UPDATE leads SET decision_maker = $1, updated_at = now()
+       WHERE id = $2 AND (decision_maker IS NULL OR decision_maker = '')`,
+      [decision_maker, lead.id]
+    );
+  }
+  if (discoveredEmail) {
+    await pool.query(
+      `UPDATE leads SET email = $1, updated_at = now()
+       WHERE id = $2 AND (email IS NULL OR email = '')`,
+      [discoveredEmail, lead.id]
+    );
+  }
+
   await pool.query(
     `UPDATE audit_reports SET status = 'done', weaknesses = $1, recommendations_text = $2, mockup_html = $3, generated_at = now()
      WHERE id = $4`,
@@ -247,15 +300,6 @@ async function processAudit(lead, reportId) {
     `UPDATE leads SET outreach_status = 'Mockup Generated', updated_at = now() WHERE id = $1 AND outreach_status = 'New'`,
     [lead.id]
   );
-  // Only fill in decision_maker if the site actually named one and the lead
-  // doesn't already have one set manually — never overwrite a real entry.
-  if (decision_maker) {
-    await pool.query(
-      `UPDATE leads SET decision_maker = $1, updated_at = now()
-       WHERE id = $2 AND (decision_maker IS NULL OR decision_maker = '')`,
-      [decision_maker, lead.id]
-    );
-  }
 }
 
 module.exports = router;

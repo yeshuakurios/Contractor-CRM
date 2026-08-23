@@ -13,7 +13,9 @@ async function analyzeWeaknesses(businessName, siteText) {
         '(e.g. missing online booking, no reviews/testimonials shown, no clear phone/CTA, dated or generic copy, ' +
         'no service area or emergency-service messaging). Also check whether the text names an owner, founder, or ' +
         'manager (e.g. an "About Us" or "Meet the Owner" blurb) — only extract a name if the site actually states one; ' +
-        'never guess or infer one from the business name. Respond with ONLY valid JSON, no other text, in this shape: ' +
+        'never guess or infer one from the business name. If you name a specific person anywhere in your weaknesses ' +
+        'or recommendations text, you MUST also put that same name in decision_maker — never mention someone by name ' +
+        'in the write-up while leaving decision_maker null. Respond with ONLY valid JSON, no other text, in this shape: ' +
         '{"weaknesses": ["...", "..."], "recommendations": "a short markdown-formatted recommendations write-up, 150-300 words", ' +
         '"decision_maker": "the named owner/founder/manager, or null if the site does not name one"}',
       maxTokens: 1200,
