@@ -237,7 +237,7 @@ async function processAudit(lead, reportId) {
     );
   }
 
-  const { weaknesses, recommendations_text, mockup_html } = await runAudit(lead.business_name, lead.website);
+  const { weaknesses, recommendations_text, mockup_html, decision_maker } = await runAudit(lead.business_name, lead.website);
   await pool.query(
     `UPDATE audit_reports SET status = 'done', weaknesses = $1, recommendations_text = $2, mockup_html = $3, generated_at = now()
      WHERE id = $4`,
@@ -247,6 +247,15 @@ async function processAudit(lead, reportId) {
     `UPDATE leads SET outreach_status = 'Mockup Generated', updated_at = now() WHERE id = $1 AND outreach_status = 'New'`,
     [lead.id]
   );
+  // Only fill in decision_maker if the site actually named one and the lead
+  // doesn't already have one set manually — never overwrite a real entry.
+  if (decision_maker) {
+    await pool.query(
+      `UPDATE leads SET decision_maker = $1, updated_at = now()
+       WHERE id = $2 AND (decision_maker IS NULL OR decision_maker = '')`,
+      [decision_maker, lead.id]
+    );
+  }
 }
 
 module.exports = router;
