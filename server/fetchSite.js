@@ -43,4 +43,31 @@ function stripTags(html) {
     .trim();
 }
 
-module.exports = { fetchHtml, stripTags };
+// Runs on the raw HTML *before* stripTags discards <nav> content wholesale
+// (above) — a page-builder nav commonly links to an About/bio page using the
+// owner's real name as the link text (e.g. "Clyde J. Richardson"), which
+// then appears nowhere else in the crawled text. A Set naturally dedupes the
+// same nav rendered 2-3x per responsive breakpoint, so this stays a short
+// list regardless of how many times the nav repeats — link *labels*, not
+// full nav *blocks*, so it doesn't reintroduce the budget problem stripTags's
+// nav-strip was built to solve.
+function extractNavLinks(html) {
+  const navBlocks = html.match(/<nav[\s\S]*?<\/nav>/gi) || [];
+  const links = new Set();
+  for (const block of navBlocks) {
+    const anchors = block.match(/<a\b[^>]*>[\s\S]*?<\/a>/gi) || [];
+    for (const a of anchors) {
+      const text = a
+        .replace(/<a\b[^>]*>/i, '')
+        .replace(/<\/a>/i, '')
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/&nbsp;/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+      if (text && text.length <= 60) links.add(text);
+    }
+  }
+  return Array.from(links);
+}
+
+module.exports = { fetchHtml, stripTags, extractNavLinks };

@@ -1,7 +1,7 @@
 const express = require('express');
 const { randomUUID } = require('crypto');
 const { pool } = require('./db');
-const { searchPlaces } = require('./places');
+const { searchPlaces, getPlaceRating } = require('./places');
 const { discoverAndVerifySocials } = require('./social');
 const { runAudit } = require('./audit');
 const { computeStages, fetchStageItemRows } = require('./stages');
@@ -291,7 +291,10 @@ async function findMarketUsage(marketKey) {
 }
 
 async function processAudit(lead, reportId) {
-  const { email: discoveredEmail, ...socials } = await discoverAndVerifySocials(lead.website, lead.phone, lead.address);
+  const [{ email: discoveredEmail, ...socials }, placeRating] = await Promise.all([
+    discoverAndVerifySocials(lead.website, lead.phone, lead.address),
+    lead.place_id ? getPlaceRating(lead.place_id) : Promise.resolve(null),
+  ]);
   for (const [platform, result] of Object.entries(socials)) {
     if (!result) continue;
     // Never overwrite a link the operator entered/corrected by hand.
@@ -310,7 +313,7 @@ async function processAudit(lead, reportId) {
   const { templateIds: avoidTemplateIds, photoUrls: avoidPhotoUrls } = await findMarketUsage(marketKey);
 
   const { weaknesses, recommendations_text, mockup_html, decision_maker, style_template, style_photo_urls } =
-    await runAudit(lead.business_name, lead.website, lead.address, { leadId: lead.id, avoidTemplateIds, avoidPhotoUrls });
+    await runAudit(lead.business_name, lead.website, lead.address, { leadId: lead.id, avoidTemplateIds, avoidPhotoUrls, placeRating });
 
   // Fill in anything the audit discovered before marking the report 'done' —
   // the frontend refreshes the lead as soon as it sees that status, so these
