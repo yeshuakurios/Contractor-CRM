@@ -30,9 +30,9 @@ const TEMPLATES = [
 // learn this once. Both CSS files implement every class listed here.
 const SECTION_GUIDE = `Build the page body using EXACTLY this section structure and these class names (both are already fully styled by CSS we provide — do not add inline styles or invent new classes):
 
-<div class="topbar"><div class="container">...phone/email/address in a .topbar-info, social icon links...</div></div>
+<div class="topbar"><div class="container"><div class="topbar-info">phone/email/address only — do not add social icons or links here, none were provided</div></div></div>
 <nav class="navbar"><div class="container">
-  <a class="brand"><!-- logo image or business-name text, per the logo instruction given separately --></a>
+  <a class="brand"><!-- logo image or business-name text, per the logo instruction given separately — keep it to the business name only, no tagline, no extra words --></a>
   <div class="nav-links">Home / Services / About / Reviews / Contact links (all href="#section-id")</div>
   <a class="btn btn-primary" href="#contact">Book Now / Call Now</a>
 </div></nav>
