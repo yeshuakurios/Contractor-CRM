@@ -5,6 +5,7 @@ const { discoverAndVerifySocials } = require('./social');
 const { runAudit } = require('./audit');
 const { computeStages, fetchStageItemRows } = require('./stages');
 const { getOrCreateBillingRow } = require('./billing');
+const { isLikelyChain } = require('./chains');
 
 const router = express.Router();
 
@@ -142,9 +143,10 @@ async function createLead({ business_name, phone, address, website, email, decis
   return rows[0];
 }
 
-// Google Places import: search by location + business type, dedupe against
-// existing leads (by place_id first, falling back to name/phone match for
-// leads that predate having a place_id), bulk-create the rest.
+// Google Places import: search by location + business type (paginated, up to
+// 60 raw results), filter out recognized franchise/chain brands, dedupe
+// against existing leads (by place_id first, falling back to name/phone
+// match for leads that predate having a place_id), bulk-create the rest.
 router.post('/import/places', async (req, res, next) => {
   try {
     const { location, businessType } = req.body || {};
@@ -153,8 +155,13 @@ router.post('/import/places', async (req, res, next) => {
 
     const created = [];
     const duplicates = [];
+    const filteredChains = [];
     for (const p of results) {
       if (!p.business_name) continue;
+      if (isLikelyChain(p.business_name)) {
+        filteredChains.push(p);
+        continue;
+      }
       const { rows } = await pool.query(
         `SELECT id, business_name FROM leads
          WHERE place_id = $1 OR lower(business_name) = lower($2) OR ($3 <> '' AND phone = $3)`,
@@ -166,7 +173,7 @@ router.post('/import/places', async (req, res, next) => {
         created.push(await createLead(p));
       }
     }
-    res.json({ created, duplicates, query: `${businessType || 'plumber'} in ${location}` });
+    res.json({ created, duplicates, filtered_chains: filteredChains, query: `${businessType || 'plumber'} in ${location}` });
   } catch (err) { next(err); }
 });
 
