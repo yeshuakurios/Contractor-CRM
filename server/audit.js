@@ -40,15 +40,26 @@ async function analyzeWeaknesses(businessName, siteText) {
   }
 }
 
+// Free stock libraries have thin, inconsistently-tagged coverage of niche
+// trades — a generic "professional plumber" search can return unrelated
+// results (an electrician, an office worker) that just happen to rank for
+// that query. Filtering on the photo's own alt/tags text for an actual
+// plumbing keyword catches those before they end up on a mockup; if
+// filtering leaves nothing (a thin result set), falling back to the
+// unfiltered pool beats showing no photo at all.
+const PLUMBING_KEYWORDS = /plumb|pipe|faucet|drain|sink|water heater|leak|wrench|bathroom|toilet|shower/i;
+
 // Fetches a larger pool than we need and prefers photos not already used by
 // another lead in the same market (see leads.js), so nearby leads don't end
 // up with a literally identical hero photo — the single most noticeable
 // "these sites look copy-pasted" tell.
 async function pickPhotos(avoidPhotoUrls) {
-  const pool = await fetchStockPhotos('professional plumber at work', 6);
+  const pool = await fetchStockPhotos('plumber fixing pipe', 8);
+  const relevant = pool.filter((p) => PLUMBING_KEYWORDS.test(p.alt || ''));
+  const candidates = relevant.length ? relevant : pool;
   const avoid = new Set(avoidPhotoUrls || []);
-  const fresh = pool.filter((p) => !avoid.has(p.url));
-  return (fresh.length ? fresh : pool).slice(0, 2);
+  const fresh = candidates.filter((p) => !avoid.has(p.url));
+  return (fresh.length ? fresh : candidates).slice(0, 2);
 }
 
 async function generateMockup({ businessName, weaknesses, address, template, photos, logoUrl, accentColor }) {
@@ -73,9 +84,14 @@ async function generateMockup({ businessName, weaknesses, address, template, pho
     : `No address was provided for this business — keep any location references generic (e.g. "your area", "the ` +
       `local community") rather than inventing a specific city or state.\n`;
 
+  // A real logo almost always already has the business name baked into the
+  // graphic (a wordmark or a badge with the name inside it) — printing the
+  // name again as separate text next to it just duplicates what's already
+  // shown, and gets cramped/truncated on narrow screens for no reason.
   const logoInstruction = logoUrl
-    ? `A real logo image was found on this business's own site — use it: <a class="brand"><img src="${logoUrl}" ` +
-      `alt="${businessName} logo" style="height:36px;width:auto;"> ${businessName}</a>\n`
+    ? `A real logo image was found on this business's own site — use ONLY the image, no business-name text next ` +
+      `to it (the logo almost certainly already shows the name): <a class="brand"><img src="${logoUrl}" ` +
+      `alt="${businessName} logo" style="height:36px;width:auto;"></a>\n`
     : `No logo image was found — the .brand element should be the business name as styled text only, no <img>.\n`;
 
   const accentInstruction = accentColor
