@@ -443,9 +443,11 @@ function renderAuditSection(lead){
         html += `<div style="font-size:0.85rem;white-space:pre-wrap;background:#fff;border:1px solid var(--line);border-radius:6px;padding:10px;margin-bottom:10px;">${escapeHtml(audit.recommendations_text)}</div>`;
       }
       if (audit.mockup_html && audit.public_token) {
-        const mockupUrl = window.location.origin + '/mockup/' + audit.public_token;
-        html += `<a class="btn small secondary" href="${escapeHtml(mockupUrl)}" target="_blank" rel="noopener">View Mockup ↗</a>`;
-        html += `<p style="font-size:0.75rem;color:var(--muted);word-break:break-all;margin:6px 0 0;">Shareable link: <a href="${escapeHtml(mockupUrl)}" target="_blank" rel="noopener">${escapeHtml(mockupUrl)}</a></p>`;
+        const reportUrl = window.location.origin + '/mockup/' + audit.public_token;
+        const siteUrl = reportUrl + '/site';
+        html += `<a class="btn small secondary" href="${escapeHtml(reportUrl)}" target="_blank" rel="noopener">View Full Report ↗</a> `;
+        html += `<a class="btn small secondary" href="${escapeHtml(siteUrl)}" target="_blank" rel="noopener">Preview Site Only ↗</a>`;
+        html += `<p style="font-size:0.75rem;color:var(--muted);word-break:break-all;margin:6px 0 0;">Send this to the prospect: <a href="${escapeHtml(reportUrl)}" target="_blank" rel="noopener">${escapeHtml(reportUrl)}</a></p>`;
       }
       html += `</div>`;
     }
