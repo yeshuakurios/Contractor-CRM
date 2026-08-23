@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS leads (
   email TEXT,
   decision_maker TEXT,
   outreach_status TEXT NOT NULL DEFAULT 'New'
-    CHECK (outreach_status IN ('New','Mockup Generated','Sent to Prospect','Followed Up','Responded','Declined')),
+    CHECK (outreach_status IN ('New','Mockup Generated','Sent to Prospect','Followed Up','Responded','Declined','No Digital Presence')),
   pipeline_stage INTEGER CHECK (pipeline_stage BETWEEN 1 AND 7),
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -28,7 +28,7 @@ CREATE TABLE IF NOT EXISTS lead_socials (
   platform TEXT NOT NULL CHECK (platform IN ('facebook','instagram','x')),
   url TEXT,
   verification_status TEXT NOT NULL DEFAULT 'not_found'
-    CHECK (verification_status IN ('confirmed','unconfirmed','not_found')),
+    CHECK (verification_status IN ('confirmed','unconfirmed','not_found','manual')),
   verified_via TEXT, -- 'phone' | 'address' | null
   verified_at TIMESTAMPTZ,
   UNIQUE (lead_id, platform)
@@ -94,3 +94,15 @@ CREATE TABLE IF NOT EXISTS credentials (
   iv TEXT NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- Idempotent migrations for databases created before a CHECK constraint
+-- changed — CREATE TABLE IF NOT EXISTS above only helps a fresh database,
+-- so anything that widens an existing table's shape goes here instead.
+-- Safe to run repeatedly (`npm run migrate`) against any existing database.
+ALTER TABLE leads DROP CONSTRAINT IF EXISTS leads_outreach_status_check;
+ALTER TABLE leads ADD CONSTRAINT leads_outreach_status_check
+  CHECK (outreach_status IN ('New','Mockup Generated','Sent to Prospect','Followed Up','Responded','Declined','No Digital Presence'));
+
+ALTER TABLE lead_socials DROP CONSTRAINT IF EXISTS lead_socials_verification_status_check;
+ALTER TABLE lead_socials ADD CONSTRAINT lead_socials_verification_status_check
+  CHECK (verification_status IN ('confirmed','unconfirmed','not_found','manual'));
