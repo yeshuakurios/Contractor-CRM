@@ -1,5 +1,6 @@
 const { fetchHtml, stripTags } = require('./fetchSite');
 const { callClaude } = require('./claude');
+const { fetchStockPhotos } = require('./stockPhotos');
 
 const SITE_TEXT_CAP = 6000; // keep the prompt (and cost) small
 
@@ -33,20 +34,34 @@ async function analyzeWeaknesses(businessName, siteText) {
   }
 }
 
-async function generateMockup(businessName, weaknesses) {
+async function generateMockup(businessName, weaknesses, photos) {
+  // Ask Claude for placeholder tokens rather than real URLs — long CDN URLs
+  // are exactly the kind of string an LLM can subtly mistype, and a wrong
+  // src just shows a broken image. Swapping in the real URL afterward is
+  // deterministic and can't fail that way.
+  const photoTokens = (photos || []).map((p, i) => ({ token: `PHOTO_${i + 1}`, ...p }));
+  const photoInstructions = photoTokens.length
+    ? `Real photos are available for this mockup. Use them as <img> src values using these EXACT placeholder ` +
+      `tokens as the whole src attribute (they get swapped for real photo URLs afterward — do not alter them or ` +
+      `invent any other image source): ${photoTokens.map((p) => `${p.token} (${p.alt})`).join(', ')}. Place them ` +
+      `naturally — e.g. a hero/banner image and a service-in-progress photo. A section without a good fit for one ` +
+      `of these can stay CSS-only.\n\n`
+    : '';
+
   const html = await callClaude(
     `Business: ${businessName}\nWeaknesses to address: ${weaknesses.join('; ') || 'general modernization'}\n\n` +
-      'Produce a single self-contained HTML file (inline CSS, no external assets) showing an improved homepage ' +
-      'mockup for this plumbing business that fixes the weaknesses above — include a clear booking/call-to-action, ' +
-      'a testimonials/reviews section, and a clean modern layout. Keep the CSS reasonably concise — a complete, ' +
-      'fully-closed document matters more than exhaustive styling. Respond with ONLY the raw HTML, starting with ' +
-      '<!DOCTYPE html>, no explanation before or after.',
+      photoInstructions +
+      'Produce a single self-contained HTML file (inline CSS, no external assets other than the photo tokens ' +
+      'above) showing an improved homepage mockup for this plumbing business that fixes the weaknesses above — ' +
+      'include a clear booking/call-to-action, a testimonials/reviews section, and a clean modern layout. Keep ' +
+      'the CSS reasonably concise — a complete, fully-closed document matters more than exhaustive styling. ' +
+      'Respond with ONLY the raw HTML, starting with <!DOCTYPE html>, no explanation before or after.',
     {
       system: 'You produce compact, realistic website mockups as single HTML files for sales outreach purposes.',
       maxTokens: 8192,
     }
   );
-  const trimmed = html.trim().replace(/^```html\n?|```$/g, '');
+  let trimmed = html.trim().replace(/^```html\n?|```$/g, '');
   if (!trimmed.includes('</html>')) {
     // Response was cut off before the document closed — a previous 3000-token
     // cap did this in practice (title tag survives, but no body content ever
@@ -54,6 +69,9 @@ async function generateMockup(businessName, weaknesses) {
     const err = new Error('Mockup generation was truncated before completing — try running the audit again');
     err.status = 502;
     throw err;
+  }
+  for (const p of photoTokens) {
+    trimmed = trimmed.split(p.token).join(p.url);
   }
   return trimmed;
 }
@@ -68,7 +86,8 @@ async function runAudit(businessName, websiteUrl) {
   const siteText = stripTags(html).slice(0, SITE_TEXT_CAP);
 
   const { weaknesses, recommendations, decisionMaker } = await analyzeWeaknesses(businessName, siteText);
-  const mockupHtml = await generateMockup(businessName, weaknesses);
+  const photos = await fetchStockPhotos('professional plumber at work');
+  const mockupHtml = await generateMockup(businessName, weaknesses, photos);
 
   return { weaknesses, recommendations_text: recommendations, mockup_html: mockupHtml, decision_maker: decisionMaker };
 }
