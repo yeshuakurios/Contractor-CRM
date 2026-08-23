@@ -6,6 +6,7 @@ const leadsRouter = require('./leads');
 const { router: stagesRouter } = require('./stages');
 const { router: billingRouter } = require('./billing');
 const { stripeWebhookHandler } = require('./stripeWebhook');
+const { router: publicMockupRouter } = require('./publicMockup');
 
 const app = express();
 app.set('trust proxy', 1); // needed on Render for secure cookies + req.ip to work correctly
@@ -19,6 +20,10 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), (req,
 
 app.use(express.json());
 app.use(sessionMiddleware());
+
+// Public (unauthenticated) mockup viewer — the outreach deliverable sent to
+// a prospect, who never logs into the CRM.
+app.use('/', publicMockupRouter);
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 

@@ -364,11 +364,6 @@ async function openLeadModal(id){
         runAuditBtn.textContent = 'Run Audit';
       }
     };
-    const viewMockupBtn = document.getElementById('viewMockupBtn');
-    if (viewMockupBtn) viewMockupBtn.onclick = () => {
-      const blob = new Blob([lead.latest_audit.mockup_html], { type: 'text/html' });
-      window.open(URL.createObjectURL(blob), '_blank');
-    };
     if (lead.latest_audit && lead.latest_audit.status === 'running') pollAudit(lead.id);
 
     const startPipelineBtn = document.getElementById('startPipelineBtn');
@@ -442,8 +437,10 @@ function renderAuditSection(lead){
       if (audit.recommendations_text) {
         html += `<div style="font-size:0.85rem;white-space:pre-wrap;background:#fff;border:1px solid var(--line);border-radius:6px;padding:10px;margin-bottom:10px;">${escapeHtml(audit.recommendations_text)}</div>`;
       }
-      if (audit.mockup_html) {
-        html += `<button class="btn small secondary" id="viewMockupBtn">View Mockup</button>`;
+      if (audit.mockup_html && audit.public_token) {
+        const mockupUrl = window.location.origin + '/mockup/' + audit.public_token;
+        html += `<a class="btn small secondary" href="${escapeHtml(mockupUrl)}" target="_blank" rel="noopener">View Mockup ↗</a>`;
+        html += `<p style="font-size:0.75rem;color:var(--muted);word-break:break-all;margin:6px 0 0;">Shareable link: <a href="${escapeHtml(mockupUrl)}" target="_blank" rel="noopener">${escapeHtml(mockupUrl)}</a></p>`;
       }
       html += `</div>`;
     }

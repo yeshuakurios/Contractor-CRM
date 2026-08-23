@@ -41,6 +41,7 @@ CREATE TABLE IF NOT EXISTS audit_reports (
   weaknesses JSONB,
   mockup_html TEXT,
   recommendations_text TEXT,
+  public_token TEXT UNIQUE, -- unauthenticated share link for the mockup, e.g. /mockup/:public_token
   generated_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
