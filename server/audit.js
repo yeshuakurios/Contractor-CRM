@@ -11,8 +11,11 @@ async function analyzeWeaknesses(businessName, siteText) {
         'You are a website auditor for a plumbing-automation agency that pitches redesigns to independent plumbers. ' +
         'Given a business name and their current website\'s text content, identify concrete weaknesses ' +
         '(e.g. missing online booking, no reviews/testimonials shown, no clear phone/CTA, dated or generic copy, ' +
-        'no service area or emergency-service messaging). Respond with ONLY valid JSON, no other text, in this shape: ' +
-        '{"weaknesses": ["...", "..."], "recommendations": "a short markdown-formatted recommendations write-up, 150-300 words"}',
+        'no service area or emergency-service messaging). Also check whether the text names an owner, founder, or ' +
+        'manager (e.g. an "About Us" or "Meet the Owner" blurb) — only extract a name if the site actually states one; ' +
+        'never guess or infer one from the business name. Respond with ONLY valid JSON, no other text, in this shape: ' +
+        '{"weaknesses": ["...", "..."], "recommendations": "a short markdown-formatted recommendations write-up, 150-300 words", ' +
+        '"decision_maker": "the named owner/founder/manager, or null if the site does not name one"}',
       maxTokens: 1200,
     }
   );
@@ -21,9 +24,10 @@ async function analyzeWeaknesses(businessName, siteText) {
     return {
       weaknesses: Array.isArray(parsed.weaknesses) ? parsed.weaknesses : [],
       recommendations: typeof parsed.recommendations === 'string' ? parsed.recommendations : raw,
+      decisionMaker: typeof parsed.decision_maker === 'string' && parsed.decision_maker.trim() ? parsed.decision_maker.trim() : null,
     };
   } catch {
-    return { weaknesses: [], recommendations: raw };
+    return { weaknesses: [], recommendations: raw, decisionMaker: null };
   }
 }
 
@@ -51,10 +55,10 @@ async function runAudit(businessName, websiteUrl) {
   }
   const siteText = stripTags(html).slice(0, SITE_TEXT_CAP);
 
-  const { weaknesses, recommendations } = await analyzeWeaknesses(businessName, siteText);
+  const { weaknesses, recommendations, decisionMaker } = await analyzeWeaknesses(businessName, siteText);
   const mockupHtml = await generateMockup(businessName, weaknesses);
 
-  return { weaknesses, recommendations_text: recommendations, mockup_html: mockupHtml };
+  return { weaknesses, recommendations_text: recommendations, mockup_html: mockupHtml, decision_maker: decisionMaker };
 }
 
 module.exports = { runAudit };
