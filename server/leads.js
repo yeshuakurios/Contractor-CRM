@@ -85,6 +85,15 @@ router.delete('/:id', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+router.post('/bulk-delete', async (req, res, next) => {
+  try {
+    const ids = Array.isArray(req.body && req.body.ids) ? req.body.ids.map(Number).filter(Number.isInteger) : [];
+    if (!ids.length) return res.status(400).json({ error: 'ids must be a non-empty array of lead ids' });
+    const { rowCount } = await pool.query('DELETE FROM leads WHERE id = ANY($1::int[])', [ids]);
+    res.json({ deleted: rowCount });
+  } catch (err) { next(err); }
+});
+
 router.post('/:id/notes', async (req, res, next) => {
   try {
     const text = (req.body && req.body.text || '').trim();

@@ -92,7 +92,7 @@
 
 const OUTREACH_STATUSES = ['New','Mockup Generated','Sent to Prospect','Followed Up','Responded','Declined'];
 
-let state = { leads: [], activeTab: 'leads', filterStatus: 'all', searchQuery: '' };
+let state = { leads: [], activeTab: 'leads', filterStatus: 'all', searchQuery: '', selectedIds: new Set() };
 
 async function api(path, opts) {
   const res = await fetch('/api' + path, {
@@ -147,12 +147,23 @@ function renderLeads(){
   if (!leads.length) {
     html += `<div class="empty">No leads match. Try the Import tab to load some.</div>`;
   } else {
+    const allSelected = leads.length > 0 && leads.every(l => state.selectedIds.has(l.id));
+    html += `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+      <label style="display:flex;align-items:center;gap:6px;font-size:0.8rem;color:var(--muted);">
+        <input type="checkbox" id="selectAllCheck" ${allSelected ? 'checked' : ''}> Select all
+      </label>
+      ${state.selectedIds.size ? `<button class="btn small rust" id="bulkDeleteBtn">Delete Selected (${state.selectedIds.size})</button>` : ''}
+    </div>`;
     leads.forEach(l => {
       html += `
-      <div class="lead-card" data-id="${l.id}">
-        <h3>${escapeHtml(l.business_name)}</h3>
-        <div class="meta">${escapeHtml(l.phone||'no phone')} · ${escapeHtml(l.address||'no address')}</div>
-        <span class="badge ${l.outreach_status.replace(/ .*/,'')}">${escapeHtml(l.outreach_status)}</span>
+      <div class="lead-card" data-id="${l.id}" style="display:flex;gap:10px;align-items:flex-start;">
+        <input type="checkbox" class="lead-select-check" data-id="${l.id}" ${state.selectedIds.has(l.id) ? 'checked' : ''} style="margin-top:4px;">
+        <div style="flex:1;">
+          <h3>${escapeHtml(l.business_name)}</h3>
+          <div class="meta">${escapeHtml(l.phone||'no phone')} · ${escapeHtml(l.address||'no address')}</div>
+          <span class="badge ${l.outreach_status.replace(/ .*/,'')}">${escapeHtml(l.outreach_status)}</span>
+        </div>
       </div>`;
     });
   }
@@ -199,8 +210,32 @@ function attachHandlers(){
   const addBtn = document.getElementById('addLeadBtn');
   if (addBtn) addBtn.onclick = () => openLeadModal(null);
   document.querySelectorAll('.lead-card').forEach(card => {
-    card.onclick = () => openLeadModal(card.dataset.id);
+    card.onclick = (e) => { if (!e.target.classList.contains('lead-select-check')) openLeadModal(card.dataset.id); };
   });
+  document.querySelectorAll('.lead-select-check').forEach(cb => {
+    cb.onclick = (e) => e.stopPropagation();
+    cb.onchange = () => {
+      const id = Number(cb.dataset.id);
+      if (cb.checked) state.selectedIds.add(id); else state.selectedIds.delete(id);
+      render();
+    };
+  });
+  const selectAllCheck = document.getElementById('selectAllCheck');
+  if (selectAllCheck) selectAllCheck.onchange = () => {
+    const leads = filteredLeads();
+    if (selectAllCheck.checked) leads.forEach(l => state.selectedIds.add(l.id));
+    else leads.forEach(l => state.selectedIds.delete(l.id));
+    render();
+  };
+  const bulkDeleteBtn = document.getElementById('bulkDeleteBtn');
+  if (bulkDeleteBtn) bulkDeleteBtn.onclick = async () => {
+    const count = state.selectedIds.size;
+    if (!confirm(`Delete ${count} lead${count===1?'':'s'}? This cannot be undone.`)) return;
+    await api('/leads/bulk-delete', { method: 'POST', body: JSON.stringify({ ids: Array.from(state.selectedIds) }) });
+    state.selectedIds.clear();
+    await loadLeads();
+    render();
+  };
 
   const importBtn = document.getElementById('previewImportBtn');
   if (importBtn) importBtn.onclick = async () => {

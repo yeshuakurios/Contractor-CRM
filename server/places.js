@@ -1,11 +1,37 @@
-// Wraps Google's Places API (New) Text Search. Server-side only — the API
-// key never reaches the browser.
+// Wraps Google's Places API (New) Text Search, plus Geocoding to turn a
+// city name into a search radius. Server-side only — the API key never
+// reaches the browser.
 const FIELD_MASK = 'places.id,places.displayName,places.formattedAddress,places.nationalPhoneNumber,places.websiteUri,nextPageToken';
 const MAX_PAGES = 3; // Text Search caps each request at 20 results; 3 pages = up to 60.
 const PAGE_TOKEN_DELAY_MS = 2000; // Google's next_page_token needs a moment to become valid.
+const DEFAULT_RADIUS_METERS = 40000; // ~25 miles — covers a city's suburbs, not just its core.
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// Best-effort: a plain city/state string only tells Text Search's relevance
+// ranking to *prefer* that area, which under-covers suburbs (e.g. "plumber
+// in Cincinnati, OH" barely surfaces West Chester, ~20mi out). Geocoding the
+// location and biasing Text Search to a real radius around it fixes that.
+// Returns null on any failure so callers can fall back to the plain query
+// instead of failing the whole import over a geocoding hiccup.
+async function geocodeLocation(location) {
+  const apiKey = process.env.GOOGLE_PLACES_API_KEY;
+  try {
+    const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(location)}&key=${apiKey}`;
+    const res = await fetch(url);
+    const data = await res.json();
+    if (data.status !== 'OK' || !data.results || !data.results[0]) {
+      console.error('Geocoding failed for', location, ':', data.status, data.error_message || '');
+      return null;
+    }
+    const { lat, lng } = data.results[0].geometry.location;
+    return { latitude: lat, longitude: lng };
+  } catch (err) {
+    console.error('Geocoding request failed for', location, err.message);
+    return null;
+  }
 }
 
 async function fetchPage(apiKey, body) {
@@ -29,10 +55,10 @@ async function fetchPage(apiKey, body) {
 }
 
 // Fetches up to MAX_PAGES pages (Text Search's per-request cap is 20 results,
-// so this returns up to 60) — a single request only returned Google's first
-// page, which is why imports were capped at ~20 regardless of how many
-// matching businesses actually existed in the area.
-async function searchPlaces(location, businessType) {
+// so this returns up to 60), biased to a real radius around the geocoded
+// location when geocoding succeeds — falls back to a plain text query
+// otherwise (e.g. Geocoding API not yet enabled on the project).
+async function searchPlaces(location, businessType, radiusMeters = DEFAULT_RADIUS_METERS) {
   const apiKey = process.env.GOOGLE_PLACES_API_KEY;
   if (!apiKey) {
     const err = new Error('GOOGLE_PLACES_API_KEY is not configured');
@@ -40,12 +66,17 @@ async function searchPlaces(location, businessType) {
     throw err;
   }
 
-  const textQuery = `${businessType} in ${location}`;
+  const center = await geocodeLocation(location);
+  const textQuery = `${businessType} near ${location}`;
+  const locationBias = center ? { circle: { center, radius: radiusMeters } } : undefined;
+
   const results = [];
   let pageToken;
 
   for (let page = 0; page < MAX_PAGES; page++) {
-    const body = pageToken ? { textQuery, pageToken } : { textQuery, pageSize: 20 };
+    const body = pageToken
+      ? { textQuery, pageToken }
+      : { textQuery, pageSize: 20, ...(locationBias ? { locationBias } : {}) };
     const data = await fetchPage(apiKey, body);
 
     for (const p of data.places || []) {
