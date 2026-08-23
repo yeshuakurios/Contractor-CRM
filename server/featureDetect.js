@@ -29,4 +29,23 @@ function detectEmbeddedFeatures(html) {
   return FEATURE_SIGNATURES.filter(({ pattern }) => pattern.test(html)).map(({ label }) => label);
 }
 
-module.exports = { detectEmbeddedFeatures };
+// Plain-text trust signals a plumbing-site audit commonly claims are
+// "missing" — licensing/insurance, warranties, free estimates, years-in-
+// business, star ratings — even when the visible copy states them outright.
+// This is a straight keyword check over the already-stripped site text, so
+// it catches the case the LLM analysis itself misses or glosses over: the
+// text plainly says "Licensed and Insured" or "1-year warranty" but the
+// generated weakness list claims no licensing/warranty info is shown.
+const TEXT_SIGNATURES = [
+  { label: 'licensing/insurance mention', pattern: /\blicens(e|ed|ing)\b|\binsured\b/i },
+  { label: 'warranty/guarantee mention', pattern: /\bwarrant(y|ies)\b|\bguarantee[ds]?\b/i },
+  { label: 'free estimate/pricing mention', pattern: /\bfree estimate|no[- ]cost estimate|transparent pricing|upfront pricing|no[- ]obligation quote\b/i },
+  { label: 'years-in-business mention', pattern: /\b\d{1,3}\+?\s*years?\b/i },
+  { label: 'star rating or review count', pattern: /\b\d(\.\d)?\s*(\/\s*5|out of 5|star)|ratings?\s*&?\s*reviews?/i },
+];
+
+function detectTextSignals(siteText) {
+  return TEXT_SIGNATURES.filter(({ pattern }) => pattern.test(siteText)).map(({ label }) => label);
+}
+
+module.exports = { detectEmbeddedFeatures, detectTextSignals };
