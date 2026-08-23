@@ -4,9 +4,18 @@ const express = require('express');
 const { sessionMiddleware, requireAuth, loginRateLimit, login, logout } = require('./auth');
 const leadsRouter = require('./leads');
 const { router: stagesRouter } = require('./stages');
+const { router: billingRouter } = require('./billing');
+const { stripeWebhookHandler } = require('./stripeWebhook');
 
 const app = express();
 app.set('trust proxy', 1); // needed on Render for secure cookies + req.ip to work correctly
+
+// Stripe webhook needs the raw request body for signature verification, and
+// is called unauthenticated by Stripe (no session) — must be registered
+// before express.json() and before the auth gate below.
+app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), (req, res, next) =>
+  stripeWebhookHandler(req, res).catch(next)
+);
 
 app.use(express.json());
 app.use(sessionMiddleware());
@@ -22,6 +31,7 @@ app.get('/api/auth/me', requireAuth, (req, res) => res.json({ userId: req.sessio
 app.use('/api', requireAuth);
 app.use('/api/leads', leadsRouter);
 app.use('/api/leads', stagesRouter);
+app.use('/api/leads', billingRouter);
 
 app.use(express.static(path.join(__dirname, '..', 'public')));
 

@@ -1,15 +1,16 @@
 const express = require('express');
 const { pool } = require('./db');
+const { getOrCreateBillingRow } = require('./billing');
 
 const router = express.Router();
 
 // Static per the spec — stages/items aren't user-editable, only their
-// checked state per lead is. Stage 1's "fee_agreed" item is a manual
-// checkbox for now; once Stripe billing lands it becomes read-only and
-// gets set automatically from the webhook instead.
+// checked state per lead is. Stage 1's "fee_agreed" item is stripeControlled:
+// its checked state comes from billing.one_time_payment_status, not manual
+// entry — the webhook is what sets it, once Stripe confirms the $297 paid.
 const STAGES = [
   { number: 1, label: 'Website Agreement', items: [
-    { key: 'fee_agreed', label: '$297 build fee agreed' },
+    { key: 'fee_agreed', label: '$297 build fee agreed (set automatically once Stripe confirms payment)', stripeControlled: true },
     { key: 'domain_access', label: 'Domain/DNS access received' },
     { key: 'mockup_approved', label: 'Mockup approved by client' },
   ]},
@@ -55,14 +56,18 @@ function findStage(num) {
 // Pure: builds the per-lead stage view from already-fetched item rows.
 // Only the current stage's items are editable — earlier stages are locked
 // history (their gate was already enforced on advance), later stages are
-// locked future (no skipping ahead).
-function computeStages(itemRows, pipelineStage) {
+// locked future (no skipping ahead). stripeControlled items ignore itemRows
+// entirely and derive their checked state from the billing row instead.
+function computeStages(itemRows, pipelineStage, billing) {
   const checkedMap = new Map(itemRows.map((r) => [`${r.stage_number}:${r.item_key}`, r.checked]));
   return STAGES.map((s) => {
     const items = s.items.map((i) => ({
       key: i.key,
       label: i.label,
-      checked: checkedMap.get(`${s.number}:${i.key}`) || false,
+      stripeControlled: !!i.stripeControlled,
+      checked: i.stripeControlled
+        ? !!(billing && billing.one_time_payment_status === 'paid')
+        : (checkedMap.get(`${s.number}:${i.key}`) || false),
     }));
     return {
       number: s.number,
@@ -87,8 +92,8 @@ router.get('/:id/stages', async (req, res, next) => {
     const { rows } = await pool.query('SELECT id, pipeline_stage FROM leads WHERE id = $1', [req.params.id]);
     const lead = rows[0];
     if (!lead) return res.status(404).json({ error: 'Not found' });
-    const itemRows = await fetchStageItemRows(lead.id);
-    res.json({ pipeline_stage: lead.pipeline_stage, stages: computeStages(itemRows, lead.pipeline_stage) });
+    const [itemRows, billing] = await Promise.all([fetchStageItemRows(lead.id), getOrCreateBillingRow(lead.id)]);
+    res.json({ pipeline_stage: lead.pipeline_stage, stages: computeStages(itemRows, lead.pipeline_stage, billing) });
   } catch (err) { next(err); }
 });
 
@@ -110,6 +115,9 @@ router.patch('/:id/stages/:stageNumber/items/:itemKey', async (req, res, next) =
     if (!stage) return res.status(400).json({ error: 'Invalid stage number' });
     const item = stage.items.find((i) => i.key === req.params.itemKey);
     if (!item) return res.status(400).json({ error: 'Invalid item key' });
+    if (item.stripeControlled) {
+      return res.status(400).json({ error: 'This item is set automatically by Stripe, not manually' });
+    }
 
     const { rows } = await pool.query('SELECT id, pipeline_stage FROM leads WHERE id = $1', [req.params.id]);
     const lead = rows[0];
@@ -138,13 +146,12 @@ router.post('/:id/stages/advance', async (req, res, next) => {
     if (lead.pipeline_stage == null) return res.status(400).json({ error: 'Pipeline not started' });
     if (lead.pipeline_stage >= 7) return res.status(400).json({ error: 'Already at the final stage' });
 
-    const itemRows = await fetchStageItemRows(lead.id);
-    const currentStage = findStage(lead.pipeline_stage);
-    const allChecked = currentStage.items.every((i) => {
-      const row = itemRows.find((r) => r.stage_number === lead.pipeline_stage && r.item_key === i.key);
-      return row && row.checked;
-    });
-    if (!allChecked) return res.status(400).json({ error: 'Complete all checklist items in the current stage first' });
+    const [itemRows, billing] = await Promise.all([fetchStageItemRows(lead.id), getOrCreateBillingRow(lead.id)]);
+    const stagesView = computeStages(itemRows, lead.pipeline_stage, billing);
+    const currentStageView = stagesView.find((s) => s.number === lead.pipeline_stage);
+    if (!currentStageView.complete) {
+      return res.status(400).json({ error: 'Complete all checklist items in the current stage first' });
+    }
 
     const nextStage = lead.pipeline_stage + 1;
     await pool.query('UPDATE leads SET pipeline_stage = $1, updated_at = now() WHERE id = $2', [nextStage, lead.id]);

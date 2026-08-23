@@ -253,6 +253,7 @@ async function openLeadModal(id){
         <select id="f_status">${OUTREACH_STATUSES.map(s => `<option value="${s}" ${lead.outreach_status===s?'selected':''}>${s}</option>`).join('')}</select>
       </div>
       ${isNew ? '' : renderAuditSection(lead)}
+      ${isNew ? '' : renderBillingSection(lead)}
       ${isNew ? '' : renderStagesSection(lead)}
       ${isNew ? '' : `
       <div class="field-row"><label>Activity Log</label></div>
@@ -356,6 +357,22 @@ async function openLeadModal(id){
         openLeadModal(lead.id);
       } catch (e) { alert(e.message); }
     };
+
+    const wireCheckoutBtn = (btnId, type) => {
+      const btn = document.getElementById(btnId);
+      if (!btn) return;
+      btn.onclick = async () => {
+        btn.disabled = true;
+        try {
+          const { url } = await api(`/leads/${lead.id}/billing/checkout`, { method: 'POST', body: JSON.stringify({ type }) });
+          document.getElementById('checkoutLinkResult').innerHTML =
+            `<p style="font-size:0.8rem;margin-top:8px;word-break:break-all;">Send this to the client: <a href="${escapeHtml(url)}" target="_blank" rel="noopener">${escapeHtml(url)}</a></p>`;
+        } catch (e) { alert(e.message); }
+        btn.disabled = false;
+      };
+    };
+    wireCheckoutBtn('checkoutOnetimeBtn', 'onetime');
+    wireCheckoutBtn('checkoutSubBtn', 'subscription');
   }
 }
 
@@ -416,19 +433,43 @@ function renderStagesSection(lead){
   if (current) {
     html += `<div style="background:#fff;border:1px solid var(--line);border-radius:6px;padding:10px 12px;">`;
     current.items.forEach(i => {
-      html += `
-      <label style="display:flex;align-items:center;gap:8px;font-size:0.85rem;padding:5px 0;">
-        <input type="checkbox" class="stage-item-check" data-stage="${current.number}" data-item="${i.key}" ${i.checked ? 'checked' : ''}>
-        ${escapeHtml(i.label)}
-      </label>`;
+      if (i.stripeControlled) {
+        html += `
+        <div style="display:flex;align-items:center;gap:8px;font-size:0.85rem;padding:5px 0;color:${i.checked ? 'var(--ok)' : 'var(--muted)'};">
+          ${i.checked ? '✓' : '○'} ${escapeHtml(i.label)}
+        </div>`;
+      } else {
+        html += `
+        <label style="display:flex;align-items:center;gap:8px;font-size:0.85rem;padding:5px 0;">
+          <input type="checkbox" class="stage-item-check" data-stage="${current.number}" data-item="${i.key}" ${i.checked ? 'checked' : ''}>
+          ${escapeHtml(i.label)}
+        </label>`;
+      }
     });
     html += `</div>`;
+    if (current.number === 2 && lead.billing && lead.billing.subscription_status !== 'active') {
+      html += `<p style="font-size:0.8rem;color:var(--warn);margin:10px 0 4px;">Subscription not active yet — see Billing above to send the $99/mo link.</p>`;
+    }
     if (current.complete && current.number < 7) {
       html += `<button class="btn block brass" id="advanceStageBtn" style="margin-top:10px;">Advance to Stage ${current.number + 1}</button>`;
     } else if (current.complete && current.number === 7) {
       html += `<p style="color:var(--ok);font-size:0.85rem;margin-top:10px;">✓ Fully Optimized — all stages complete.</p>`;
     }
   }
+  return html;
+}
+
+function renderBillingSection(lead){
+  const b = lead.billing || { one_time_payment_status: 'none', subscription_status: 'none', next_billing_date: null };
+  let html = `<div class="field-row"><label>Billing</label></div>`;
+  html += `<div style="font-size:0.85rem;margin-bottom:8px;">
+    <span class="badge">$297 fee: ${escapeHtml(b.one_time_payment_status)}</span>
+    <span class="badge" style="margin-left:6px;">Subscription: ${escapeHtml(b.subscription_status)}</span>
+  </div>`;
+  html += `<div style="display:flex;gap:8px;">`;
+  html += `<button class="btn small" id="checkoutOnetimeBtn" ${b.one_time_payment_status === 'paid' ? 'disabled' : ''}>Send $297 Link</button>`;
+  html += `<button class="btn small secondary" id="checkoutSubBtn" ${b.subscription_status === 'active' ? 'disabled' : ''}>Send $99/mo Link</button>`;
+  html += `</div><div id="checkoutLinkResult"></div>`;
   return html;
 }
 
