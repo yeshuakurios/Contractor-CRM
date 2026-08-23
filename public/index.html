@@ -461,6 +461,10 @@ function renderAuditSection(lead){
       html += `<p style="color:var(--rust);font-size:0.85rem;margin-top:10px;">Audit failed. Try again.</p>`;
     } else if (audit.status === 'done') {
       html += `<div style="margin-top:10px;">`;
+      const auditedAt = audit.generated_at || audit.created_at;
+      if (auditedAt) {
+        html += `<p style="font-size:0.72rem;color:var(--muted);margin:0 0 8px;">Audited ${new Date(auditedAt).toLocaleDateString()} — the site may have changed since. Run Audit again to refresh.</p>`;
+      }
       if (audit.weaknesses && audit.weaknesses.length) {
         html += `<div style="font-family:'Courier New',monospace;font-size:0.68rem;text-transform:uppercase;color:var(--muted);margin-bottom:4px;">Weaknesses Found</div>`;
         html += `<ul style="font-size:0.85rem;margin:0 0 10px 18px;padding:0;">` + audit.weaknesses.map(w => `<li>${escapeHtml(w)}</li>`).join('') + `</ul>`;
