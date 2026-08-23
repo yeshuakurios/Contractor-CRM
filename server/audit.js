@@ -5,7 +5,12 @@ const { extractLogoUrl, extractAccentColor } = require('./branding');
 const { detectEmbeddedFeatures, detectTextSignals } = require('./featureDetect');
 const { SECTION_GUIDE, pickTemplate } = require('./mockupTemplates');
 
-const SITE_TEXT_CAP = 6000; // keep the prompt (and cost) small
+// Raised from 6000: real sites often front-load boilerplate (repeated nav —
+// stripped separately in fetchSite.js — plus things like a full blog-post
+// grid) ahead of the actual marketing copy in document order, so a small cap
+// was truncating away real content (licensing, warranty, pricing, etc.)
+// before the audit ever saw it, making it look missing when it wasn't.
+const SITE_TEXT_CAP = 14000;
 
 function escapeHtml(s) {
   return (s || '').toString().replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
