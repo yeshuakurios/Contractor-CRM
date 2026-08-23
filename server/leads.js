@@ -253,6 +253,43 @@ router.get('/:id/audit', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// Crude "same market" grouping so nearby leads don't get an identical-looking
+// mockup — good enough given addresses come from Places imports/pasted data
+// in a fairly consistent "..., City, ST ZIP" shape, no need for a real
+// geocoded market concept just to avoid style collisions.
+function deriveMarketKey(address) {
+  if (!address) return null;
+  const parts = address.split(',').map((p) => p.trim()).filter(Boolean);
+  if (parts.length < 2) return null;
+  // Last segment is typically "ST 12345" — strip the zip so leads a few
+  // blocks apart (different zip, same city) still land in the same market.
+  const state = parts[parts.length - 1].replace(/\d[\d-]*\s*$/, '').trim();
+  const city = parts[parts.length - 2];
+  const key = `${city}, ${state}`.toLowerCase().trim();
+  return key === ',' ? null : key;
+}
+
+// Looks at recently-completed audits to see which base template and stock
+// photos have already been used by other leads in the same market, so
+// runAudit can steer away from repeating them.
+async function findMarketUsage(marketKey) {
+  if (!marketKey) return { templateIds: [], photoUrls: [] };
+  const { rows } = await pool.query(
+    `SELECT ar.style_template, ar.style_photo_urls, l.address
+     FROM audit_reports ar JOIN leads l ON l.id = ar.lead_id
+     WHERE ar.status = 'done' AND ar.style_template IS NOT NULL
+     ORDER BY ar.created_at DESC LIMIT 200`
+  );
+  const templateIds = [];
+  const photoUrls = [];
+  for (const row of rows) {
+    if (deriveMarketKey(row.address) !== marketKey) continue;
+    if (row.style_template) templateIds.push(row.style_template);
+    if (Array.isArray(row.style_photo_urls)) photoUrls.push(...row.style_photo_urls);
+  }
+  return { templateIds, photoUrls };
+}
+
 async function processAudit(lead, reportId) {
   const { email: discoveredEmail, ...socials } = await discoverAndVerifySocials(lead.website, lead.phone, lead.address);
   for (const [platform, result] of Object.entries(socials)) {
@@ -269,7 +306,11 @@ async function processAudit(lead, reportId) {
     );
   }
 
-  const { weaknesses, recommendations_text, mockup_html, decision_maker } = await runAudit(lead.business_name, lead.website, lead.address);
+  const marketKey = deriveMarketKey(lead.address);
+  const { templateIds: avoidTemplateIds, photoUrls: avoidPhotoUrls } = await findMarketUsage(marketKey);
+
+  const { weaknesses, recommendations_text, mockup_html, decision_maker, style_template, style_photo_urls } =
+    await runAudit(lead.business_name, lead.website, lead.address, { leadId: lead.id, avoidTemplateIds, avoidPhotoUrls });
 
   // Fill in anything the audit discovered before marking the report 'done' —
   // the frontend refreshes the lead as soon as it sees that status, so these
@@ -292,9 +333,10 @@ async function processAudit(lead, reportId) {
   }
 
   await pool.query(
-    `UPDATE audit_reports SET status = 'done', weaknesses = $1, recommendations_text = $2, mockup_html = $3, generated_at = now()
-     WHERE id = $4`,
-    [JSON.stringify(weaknesses), recommendations_text, mockup_html, reportId]
+    `UPDATE audit_reports SET status = 'done', weaknesses = $1, recommendations_text = $2, mockup_html = $3,
+       style_template = $4, style_photo_urls = $5, generated_at = now()
+     WHERE id = $6`,
+    [JSON.stringify(weaknesses), recommendations_text, mockup_html, style_template, JSON.stringify(style_photo_urls), reportId]
   );
   await pool.query(
     `UPDATE leads SET outreach_status = 'Mockup Generated', updated_at = now() WHERE id = $1 AND outreach_status = 'New'`,

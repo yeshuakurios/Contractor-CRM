@@ -42,6 +42,8 @@ CREATE TABLE IF NOT EXISTS audit_reports (
   mockup_html TEXT,
   recommendations_text TEXT,
   public_token TEXT UNIQUE, -- unauthenticated share link for the mockup, e.g. /mockup/:public_token
+  style_template TEXT, -- which base mockup template was used (see server/mockupTemplates.js)
+  style_photo_urls JSONB, -- stock photo URLs used, so nearby leads can avoid repeats
   generated_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -106,3 +108,6 @@ ALTER TABLE leads ADD CONSTRAINT leads_outreach_status_check
 ALTER TABLE lead_socials DROP CONSTRAINT IF EXISTS lead_socials_verification_status_check;
 ALTER TABLE lead_socials ADD CONSTRAINT lead_socials_verification_status_check
   CHECK (verification_status IN ('confirmed','unconfirmed','not_found','manual'));
+
+ALTER TABLE audit_reports ADD COLUMN IF NOT EXISTS style_template TEXT;
+ALTER TABLE audit_reports ADD COLUMN IF NOT EXISTS style_photo_urls JSONB;
