@@ -269,7 +269,7 @@ async function processAudit(lead, reportId) {
     );
   }
 
-  const { weaknesses, recommendations_text, mockup_html, decision_maker } = await runAudit(lead.business_name, lead.website);
+  const { weaknesses, recommendations_text, mockup_html, decision_maker } = await runAudit(lead.business_name, lead.website, lead.address);
 
   // Fill in anything the audit discovered before marking the report 'done' —
   // the frontend refreshes the lead as soon as it sees that status, so these

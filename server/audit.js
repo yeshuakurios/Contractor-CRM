@@ -34,7 +34,7 @@ async function analyzeWeaknesses(businessName, siteText) {
   }
 }
 
-async function generateMockup(businessName, weaknesses, photos) {
+async function generateMockup(businessName, weaknesses, photos, address) {
   // Ask Claude for placeholder tokens rather than real URLs — long CDN URLs
   // are exactly the kind of string an LLM can subtly mistype, and a wrong
   // src just shows a broken image. Swapping in the real URL afterward is
@@ -48,8 +48,24 @@ async function generateMockup(businessName, weaknesses, photos) {
       `of these can stay CSS-only.\n\n`
     : '';
 
+  // A business name alone is exactly the kind of proper noun an LLM can
+  // conflate with a real, similarly-named company it knows from training —
+  // this has actually happened (a mockup pulled in a real NY-based
+  // business's location). Grounding it to the lead's real address and
+  // explicitly forbidding outside knowledge closes that off.
+  const locationInstruction = address
+    ? `This business's real address is: ${address}. Any location-specific copy (service area, city mentions, etc.) ` +
+      `must use ONLY this location — never a different city, state, or region.\n`
+    : `No address was provided for this business — keep any location references generic (e.g. "your area", "the ` +
+      `local community") rather than inventing a specific city or state.\n`;
+
   const html = await callClaude(
     `Business: ${businessName}\nWeaknesses to address: ${weaknesses.join('; ') || 'general modernization'}\n\n` +
+      locationInstruction +
+      'IMPORTANT: Do not use any outside knowledge you may have about a real business with this or a similar name. ' +
+      'Treat the business name as a label only — invent no specific facts (founding year, awards, service area ' +
+      'beyond the address above, etc.) not given in this prompt. Any testimonials/reviews you write must be ' +
+      'generic and clearly illustrative, never attributed to a real person or a real business.\n\n' +
       photoInstructions +
       'Produce a single self-contained HTML file (inline CSS, no external assets other than the photo tokens ' +
       'above) showing an improved homepage mockup for this plumbing business that fixes the weaknesses above — ' +
@@ -76,7 +92,7 @@ async function generateMockup(businessName, weaknesses, photos) {
   return trimmed;
 }
 
-async function runAudit(businessName, websiteUrl) {
+async function runAudit(businessName, websiteUrl, address) {
   const html = await fetchHtml(websiteUrl);
   if (!html) {
     const err = new Error('Could not fetch the website — check the URL is reachable');
@@ -87,7 +103,7 @@ async function runAudit(businessName, websiteUrl) {
 
   const { weaknesses, recommendations, decisionMaker } = await analyzeWeaknesses(businessName, siteText);
   const photos = await fetchStockPhotos('professional plumber at work');
-  const mockupHtml = await generateMockup(businessName, weaknesses, photos);
+  const mockupHtml = await generateMockup(businessName, weaknesses, photos, address);
 
   return { weaknesses, recommendations_text: recommendations, mockup_html: mockupHtml, decision_maker: decisionMaker };
 }
