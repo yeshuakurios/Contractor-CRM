@@ -277,6 +277,11 @@ async function openLeadModal(id){
     ? { id:null, business_name:'', phone:'', address:'', website:'', email:'', decision_maker:'', outreach_status:'New', activity: [] }
     : await api('/leads/' + id);
 
+  // Guards against a late-arriving async refresh (e.g. an audit poll tick,
+  // or a note/checkbox save) silently replacing whatever modal the user has
+  // since navigated to — every such refresh checks this before rendering.
+  currentLeadModalId = isNew ? null : String(id);
+
   const root = document.getElementById('modalRoot');
   root.innerHTML = `
   <div class="modal-backdrop" id="modalBackdrop">
@@ -342,7 +347,7 @@ async function openLeadModal(id){
       const text = input.value.trim();
       if (!text) return;
       await api('/leads/' + lead.id + '/notes', { method: 'POST', body: JSON.stringify({ text }) });
-      openLeadModal(lead.id);
+      refreshModalIfCurrent(lead.id);
     };
     document.getElementById('deleteLeadBtn').onclick = async () => {
       if (!confirm('Delete this lead? This cannot be undone.')) return;
@@ -370,7 +375,7 @@ async function openLeadModal(id){
     if (startPipelineBtn) startPipelineBtn.onclick = async () => {
       try {
         await api('/leads/' + lead.id + '/stages/start', { method: 'POST' });
-        openLeadModal(lead.id);
+        refreshModalIfCurrent(lead.id);
       } catch (e) { alert(e.message); }
     };
     document.querySelectorAll('.stage-item-check').forEach(cb => {
@@ -379,7 +384,7 @@ async function openLeadModal(id){
           await api(`/leads/${lead.id}/stages/${cb.dataset.stage}/items/${cb.dataset.item}`, {
             method: 'PATCH', body: JSON.stringify({ checked: cb.checked }),
           });
-          openLeadModal(lead.id);
+          refreshModalIfCurrent(lead.id);
         } catch (e) { alert(e.message); cb.checked = !cb.checked; }
       };
     });
@@ -387,7 +392,7 @@ async function openLeadModal(id){
     if (advanceBtn) advanceBtn.onclick = async () => {
       try {
         await api('/leads/' + lead.id + '/stages/advance', { method: 'POST' });
-        openLeadModal(lead.id);
+        refreshModalIfCurrent(lead.id);
       } catch (e) { alert(e.message); }
     };
 
@@ -508,20 +513,34 @@ function renderBillingSection(lead){
   return html;
 }
 
+let currentLeadModalId = null;
+
+// Every "refresh the modal after an async save" call site should go through
+// this instead of calling openLeadModal directly — if the user has since
+// closed this modal or opened a different lead, silently do nothing rather
+// than yanking their current view back to a stale one.
+function refreshModalIfCurrent(id){
+  if (currentLeadModalId === String(id)) openLeadModal(id);
+}
+
 let auditPollTimer = null;
 function pollAudit(id){
   if (auditPollTimer) clearTimeout(auditPollTimer);
+  if (currentLeadModalId !== String(id)) return; // user navigated away — stop polling
   auditPollTimer = setTimeout(async () => {
+    if (currentLeadModalId !== String(id)) return;
     try {
       const report = await api('/leads/' + id + '/audit');
+      if (currentLeadModalId !== String(id)) return;
       if (report.status === 'running') pollAudit(id);
-      else openLeadModal(id);
+      else refreshModalIfCurrent(id);
     } catch (e) { /* stop polling on error */ }
   }, 3000);
 }
 
 function closeModal(){
   if (auditPollTimer) { clearTimeout(auditPollTimer); auditPollTimer = null; }
+  currentLeadModalId = null;
   document.getElementById('modalRoot').innerHTML = '';
 }
 
