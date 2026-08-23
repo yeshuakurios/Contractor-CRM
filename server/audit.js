@@ -2,6 +2,7 @@ const { fetchHtml, stripTags } = require('./fetchSite');
 const { callClaude } = require('./claude');
 const { fetchStockPhotos } = require('./stockPhotos');
 const { extractLogoUrl, extractAccentColor } = require('./branding');
+const { detectEmbeddedFeatures } = require('./featureDetect');
 const { SECTION_GUIDE, pickTemplate } = require('./mockupTemplates');
 
 const SITE_TEXT_CAP = 6000; // keep the prompt (and cost) small
@@ -10,9 +11,15 @@ function escapeHtml(s) {
   return (s || '').toString().replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
-async function analyzeWeaknesses(businessName, siteText) {
+async function analyzeWeaknesses(businessName, siteText, detectedFeatures) {
+  const detectedNote = (detectedFeatures && detectedFeatures.length)
+    ? `\n\nThe page also embeds the following third-party widgets (detected via <script>/<iframe> tags in the raw ` +
+      `HTML): ${detectedFeatures.join(', ')}. These render via JavaScript, so their content does not appear in the ` +
+      `text content above — but they ARE present and working on the site. Do not list any of them, or the ` +
+      `functionality they provide, as a weakness or missing feature.`
+    : '';
   const raw = await callClaude(
-    `Business: ${businessName}\n\nWebsite text content:\n${siteText}`,
+    `Business: ${businessName}\n\nWebsite text content:\n${siteText}${detectedNote}`,
     {
       system:
         'You are a website auditor for a plumbing-automation agency that pitches redesigns to independent plumbers. ' +
@@ -162,8 +169,9 @@ async function runAudit(businessName, websiteUrl, address, opts = {}) {
     throw err;
   }
   const siteText = stripTags(html).slice(0, SITE_TEXT_CAP);
+  const detectedFeatures = detectEmbeddedFeatures(html);
 
-  const { weaknesses, recommendations, decisionMaker } = await analyzeWeaknesses(businessName, siteText);
+  const { weaknesses, recommendations, decisionMaker } = await analyzeWeaknesses(businessName, siteText, detectedFeatures);
 
   const template = pickTemplate(leadId, avoidTemplateIds);
   const logoUrl = extractLogoUrl(html, websiteUrl);
