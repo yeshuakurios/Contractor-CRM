@@ -1,4 +1,5 @@
 const express = require('express');
+const { randomUUID } = require('crypto');
 const { pool } = require('./db');
 const { searchPlaces } = require('./places');
 const { discoverAndVerifySocials } = require('./social');
@@ -198,8 +199,8 @@ router.post('/:id/audit', async (req, res, next) => {
     if (!lead.website) return res.status(400).json({ error: 'Lead has no website set' });
 
     const { rows: reportRows } = await pool.query(
-      `INSERT INTO audit_reports (lead_id, status) VALUES ($1, 'running') RETURNING *`,
-      [lead.id]
+      `INSERT INTO audit_reports (lead_id, status, public_token) VALUES ($1, 'running', $2) RETURNING *`,
+      [lead.id, randomUUID()]
     );
     const report = reportRows[0];
     res.status(202).json(report);
