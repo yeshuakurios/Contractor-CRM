@@ -177,6 +177,9 @@ function renderImport(){
 
 function renderImportSummary(result){
   let html = `<p style="color:var(--ok);font-size:0.85rem;">✓ Imported ${result.created.length} new lead${result.created.length===1?'':'s'}.</p>`;
+  if (result.filtered_chains && result.filtered_chains.length) {
+    html += `<p style="font-size:0.8rem;color:var(--muted);">Filtered out ${result.filtered_chains.length} recognized chain/franchise brand${result.filtered_chains.length===1?'':'s'}: ${result.filtered_chains.map(c => escapeHtml(c.business_name)).join(', ')}</p>`;
+  }
   if (result.duplicates.length) {
     html += `<div class="dup-list">`;
     result.duplicates.forEach(d => {
