@@ -29,6 +29,14 @@ function stripTags(html) {
   return html
     .replace(/<script[\s\S]*?<\/script>/gi, ' ')
     .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    // Responsive page builders (Duda/Hibu, Wix, etc.) commonly render the full
+    // nav menu 2-3 times over — once per breakpoint, plus a mobile drawer
+    // copy — all as real <nav> elements ahead of the actual page content in
+    // document order. Left in, that boilerplate alone can eat the entire
+    // SITE_TEXT_CAP budget before the audit ever reaches the business's real
+    // copy, making real content (licensing, warranty, pricing, etc.) look
+    // "missing" simply because it was truncated away, not because it's absent.
+    .replace(/<nav[\s\S]*?<\/nav>/gi, ' ')
     .replace(/<[^>]+>/g, ' ')
     .replace(/&nbsp;/g, ' ')
     .replace(/\s+/g, ' ')
