@@ -36,14 +36,24 @@ async function generateMockup(businessName, weaknesses) {
     `Business: ${businessName}\nWeaknesses to address: ${weaknesses.join('; ') || 'general modernization'}\n\n` +
       'Produce a single self-contained HTML file (inline CSS, no external assets) showing an improved homepage ' +
       'mockup for this plumbing business that fixes the weaknesses above — include a clear booking/call-to-action, ' +
-      'a testimonials/reviews section, and a clean modern layout. Respond with ONLY the raw HTML, starting with ' +
+      'a testimonials/reviews section, and a clean modern layout. Keep the CSS reasonably concise — a complete, ' +
+      'fully-closed document matters more than exhaustive styling. Respond with ONLY the raw HTML, starting with ' +
       '<!DOCTYPE html>, no explanation before or after.',
     {
       system: 'You produce compact, realistic website mockups as single HTML files for sales outreach purposes.',
-      maxTokens: 3000,
+      maxTokens: 8192,
     }
   );
-  return html.trim().replace(/^```html\n?|```$/g, '');
+  const trimmed = html.trim().replace(/^```html\n?|```$/g, '');
+  if (!trimmed.includes('</html>')) {
+    // Response was cut off before the document closed — a previous 3000-token
+    // cap did this in practice (title tag survives, but no body content ever
+    // gets written). Fail loudly rather than store a page that renders blank.
+    const err = new Error('Mockup generation was truncated before completing — try running the audit again');
+    err.status = 502;
+    throw err;
+  }
+  return trimmed;
 }
 
 async function runAudit(businessName, websiteUrl) {
